@@ -1,0 +1,16 @@
+bin/
+obj/
+[Dd]ebug/
+[Rr]elease/
+artifacts/
+TestResults/
+*.user
+*.suo
+.vs/
+.vscode/
+.idea/
+*.DotSettings.user
+.DS_Store
+*.received.*
+coverage*.json
+coverage*.xml

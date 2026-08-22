@@ -1,0 +1,121 @@
+# Style and analysis rules for the solution. Enforced at build time —
+# Directory.Build.props sets EnforceCodeStyleInBuild and TreatWarningsAsErrors, so
+# anything set to 'warning' below fails the build.
+
+root = true
+
+[*]
+charset = utf-8
+end_of_line = lf
+indent_style = space
+indent_size = 4
+insert_final_newline = true
+trim_trailing_whitespace = true
+
+[*.{json,yml,yaml,csproj,props,targets,slnx}]
+indent_size = 2
+
+[*.sql]
+indent_size = 4
+
+[*.md]
+trim_trailing_whitespace = false
+
+[*.cs]
+
+#### Language conventions ####
+
+csharp_style_namespace_declarations = file_scoped:warning
+csharp_using_directive_placement = outside_namespace:warning
+csharp_prefer_braces = true:warning
+csharp_style_prefer_primary_constructors = false:silent
+
+dotnet_sort_system_directives_first = true
+dotnet_separate_import_directive_groups = false
+
+csharp_style_var_for_built_in_types = false:suggestion
+csharp_style_var_when_type_is_apparent = true:suggestion
+csharp_style_var_elsewhere = false:suggestion
+
+csharp_style_expression_bodied_methods = when_on_single_line:suggestion
+csharp_style_expression_bodied_properties = true:suggestion
+csharp_style_expression_bodied_accessors = true:suggestion
+
+dotnet_style_require_accessibility_modifiers = for_non_interface_members:warning
+dotnet_style_readonly_field = true:warning
+dotnet_style_prefer_conditional_expression_over_return = true:silent
+
+csharp_style_prefer_pattern_matching = true:suggestion
+csharp_style_prefer_switch_expression = true:suggestion
+csharp_style_prefer_null_check_over_type_check = true:suggestion
+
+#### Naming ####
+
+dotnet_naming_rule.private_fields_underscore.severity = warning
+dotnet_naming_rule.private_fields_underscore.symbols = private_fields
+dotnet_naming_rule.private_fields_underscore.style = underscore_camel_case
+
+dotnet_naming_symbols.private_fields.applicable_kinds = field
+dotnet_naming_symbols.private_fields.applicable_accessibilities = private
+dotnet_naming_symbols.private_fields.required_modifiers =
+
+dotnet_naming_style.underscore_camel_case.capitalization = camel_case
+dotnet_naming_style.underscore_camel_case.required_prefix = _
+
+dotnet_naming_rule.constants_pascal_case.severity = warning
+dotnet_naming_rule.constants_pascal_case.symbols = constants
+dotnet_naming_rule.constants_pascal_case.style = pascal_case
+
+dotnet_naming_symbols.constants.applicable_kinds = field
+dotnet_naming_symbols.constants.required_modifiers = const
+
+dotnet_naming_style.pascal_case.capitalization = pascal_case
+
+#### Analyzer rules turned off deliberately ####
+
+# CA1711: flags type names ending in a "reserved" suffix. The list dates from Code Access
+# Security and includes 'Permission', which is exactly what our domain concept is called.
+dotnet_diagnostic.CA1711.severity = none
+
+# CA1716: flags type names that collide with a VB or F# keyword — 'Error' being one.
+# We ship a C# HTTP API, not a cross-language class library.
+dotnet_diagnostic.CA1716.severity = none
+
+# CA1062: null-checking every public argument. Nullable reference types already express
+# this at the type level and the compiler enforces it.
+dotnet_diagnostic.CA1062.severity = none
+
+# CA2007: ConfigureAwait(false). ASP.NET Core has no synchronization context, so this adds
+# noise to every await for no behavioural difference.
+dotnet_diagnostic.CA2007.severity = none
+
+# CA1848: LoggerMessage source-generated delegates. A real allocation win in a hot path and
+# pure ceremony everywhere else. Left as a suggestion so it can be applied where it counts.
+dotnet_diagnostic.CA1848.severity = suggestion
+
+# CA1873: flags a logging argument that is evaluated before the level is checked — a property
+# read or a boxed int is enough to trip it. As an error it forces the [LoggerMessage] partial
+# methods that CA1848 above is deliberately not requiring, so the two would contradict each
+# other. Startup and error paths log a handful of times; plain ILogger<T> calls are clearer.
+dotnet_diagnostic.CA1873.severity = suggestion
+
+# CA1515: 'make this type internal'. Endpoint extension classes are called from Program.cs
+# and some types are referenced from the test project, so public is intentional here.
+dotnet_diagnostic.CA1515.severity = none
+
+#### Analyzer rules escalated ####
+
+# Async methods that never await are almost always a bug in a handler.
+dotnet_diagnostic.CS1998.severity = warning
+
+# An unobserved Result is a swallowed failure — the whole point of the pattern.
+dotnet_diagnostic.CA1806.severity = warning
+
+# EF Core writes these files; they are not hand-maintained and should not be held to the
+# style rules that apply to code someone chose the shape of. Correctness analysers still run.
+[src/CA.Persistence/Migrations/*.cs]
+generated_code = true
+dotnet_diagnostic.IDE0161.severity = none
+dotnet_diagnostic.IDE0055.severity = none
+dotnet_diagnostic.CA1861.severity = none
+dotnet_diagnostic.CA1062.severity = none

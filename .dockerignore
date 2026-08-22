@@ -1,0 +1,18 @@
+# Without this, `COPY src/ src/` drops the host's bin/ and obj/ into the image, overwriting
+# the restore the build stage just did — and the build fails on packages that exist only in
+# the host's NuGet cache.
+**/bin/
+**/obj/
+
+**/.vs/
+**/.idea/
+**/*.user
+**/TestResults/
+
+.git/
+.github/
+tests/
+compose.yaml
+**/Dockerfile
+.dockerignore
+README.md
