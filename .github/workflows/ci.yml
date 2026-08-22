@@ -1,0 +1,31 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  build-and-test:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-dotnet@v5
+        with:
+          dotnet-version: '10.0.x'
+
+      - run: dotnet build -c Release
+
+      - name: Tests
+        run: |
+          dotnet run --project tests/CleanArchitecture.ArchitectureTests -c Release --no-build
+          dotnet run --project tests/CleanArchitecture.Application.UnitTests -c Release --no-build
+          dotnet run --project tests/CleanArchitecture.Api.IntegrationTests -c Release --no-build
+
+      - name: Smoke test
+        run: |
+          docker compose up -d --build
+          curl -fsS --retry 20 --retry-delay 3 --retry-all-errors http://localhost:8080/health/ready
+          docker compose down -v
