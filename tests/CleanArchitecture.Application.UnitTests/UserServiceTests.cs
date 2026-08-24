@@ -52,9 +52,9 @@ public sealed class UserServiceTests
     {
         _currentUser.UserId.Returns(_userId);
         _identity.FindByIdAsync(_userId, Arg.Any<CancellationToken>())
-            .Returns(new UserResponse(_userId, "ada@example.com", "Ada", "Lovelace", [Roles.User], DateTimeOffset.UnixEpoch, null));
+            .Returns(new User(_userId, "ada@example.com", "Ada", "Lovelace", [Roles.User], DateTimeOffset.UnixEpoch, null));
 
-        Result<UserResponse> result = await _service.GetCurrentAsync(CancellationToken.None);
+        Result<User> result = await _service.GetCurrentAsync(CancellationToken.None);
 
         result.IsSuccess.ShouldBeTrue();
         result.Value.Id.ShouldBe(_userId);
@@ -65,7 +65,7 @@ public sealed class UserServiceTests
     {
         _currentUser.UserId.Returns((Guid?)null);
 
-        Result<UserResponse> result = await _service.GetCurrentAsync(CancellationToken.None);
+        Result<User> result = await _service.GetCurrentAsync(CancellationToken.None);
 
         result.IsError.ShouldBeTrue();
 

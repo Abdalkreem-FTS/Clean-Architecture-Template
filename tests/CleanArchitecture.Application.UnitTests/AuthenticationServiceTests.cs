@@ -17,7 +17,7 @@ public sealed class AuthenticationServiceTests
 
     private static readonly Guid _userId = Guid.Parse("11111111-1111-1111-1111-111111111111");
 
-    private static readonly UserResponse _user = new(
+    private static readonly User _user = new(
         _userId,
         "ada@example.com",
         "Ada",
@@ -28,7 +28,7 @@ public sealed class AuthenticationServiceTests
 
     public AuthenticationServiceTests()
     {
-        _tokens.CreateAccessToken(Arg.Any<UserResponse>())
+        _tokens.CreateAccessToken(Arg.Any<Guid>(), Arg.Any<string>(), Arg.Any<IReadOnlyList<string>>())
             .Returns(new AccessToken("access-token", DateTimeOffset.UnixEpoch.AddMinutes(5)));
 
         _tokens.CreateRefreshToken()
@@ -45,8 +45,8 @@ public sealed class AuthenticationServiceTests
         _identity.AuthenticateAsync("ada@example.com", "pw", Arg.Any<CancellationToken>())
             .Returns(_user);
 
-        Result<AuthenticationResponse> result =
-            await _service.LoginAsync(new LoginRequest("ada@example.com", "pw"), CancellationToken.None);
+        Result<AuthenticationTokens> result =
+            await _service.LoginAsync("ada@example.com", "pw", CancellationToken.None);
 
         result.IsSuccess.ShouldBeTrue();
         result.Value.UserId.ShouldBe(_userId);
@@ -66,8 +66,8 @@ public sealed class AuthenticationServiceTests
         _identity.AuthenticateAsync(Arg.Any<string>(), Arg.Any<string>(), Arg.Any<CancellationToken>())
             .Returns(UserErrors.InvalidCredentials);
 
-        Result<AuthenticationResponse> result =
-            await _service.LoginAsync(new LoginRequest("ada@example.com", "wrong"), CancellationToken.None);
+        Result<AuthenticationTokens> result =
+            await _service.LoginAsync("ada@example.com", "wrong", CancellationToken.None);
 
         result.IsError.ShouldBeTrue();
         result.TopError.Code.ShouldBe(UserErrors.InvalidCredentials.Code);
@@ -78,12 +78,20 @@ public sealed class AuthenticationServiceTests
             Arg.Any<DateTimeOffset>(),
             Arg.Any<CancellationToken>());
 
-        _tokens.DidNotReceive().CreateAccessToken(Arg.Any<UserResponse>());
+        _tokens.DidNotReceive().CreateAccessToken(
+            Arg.Any<Guid>(),
+            Arg.Any<string>(),
+            Arg.Any<IReadOnlyList<string>>());
     }
 
     [Fact]
     public async Task RefreshAsync_WithAValidToken_RotatesAndReturnsANewPair()
     {
+        _refreshTokens.FindActiveUserIdAsync("hash-of-presented", Arg.Any<CancellationToken>())
+            .Returns(_userId);
+
+        _identity.FindByIdAsync(_userId, Arg.Any<CancellationToken>()).Returns(_user);
+
         _refreshTokens.RotateAsync(
                 "hash-of-presented",
                 "hashed",
@@ -91,18 +99,63 @@ public sealed class AuthenticationServiceTests
                 Arg.Any<CancellationToken>())
             .Returns(_userId);
 
-        _identity.FindByIdAsync(_userId, Arg.Any<CancellationToken>()).Returns(_user);
-
-        Result<AuthenticationResponse> result =
-            await _service.RefreshAsync(new RefreshRequest("presented"), CancellationToken.None);
+        Result<AuthenticationTokens> result =
+            await _service.RefreshAsync("presented", CancellationToken.None);
 
         result.IsSuccess.ShouldBeTrue();
         result.Value.RefreshToken.ShouldBe("raw");
     }
 
     [Fact]
-    public async Task RefreshAsync_WhenRotationConsumesNothing_NeverLooksTheUserUp()
+    public async Task RefreshAsync_WithATokenThatIsNotActive_SpendsNothingAndLooksNobodyUp()
     {
+        _refreshTokens.FindActiveUserIdAsync(Arg.Any<string>(), Arg.Any<CancellationToken>())
+            .Returns((Guid?)null);
+
+        Result<AuthenticationTokens> result =
+            await _service.RefreshAsync("stale", CancellationToken.None);
+
+        result.IsError.ShouldBeTrue();
+        result.TopError.Code.ShouldBe(UserErrors.InvalidRefreshToken.Code);
+
+        await _identity.DidNotReceive().FindByIdAsync(Arg.Any<Guid>(), Arg.Any<CancellationToken>());
+        await _refreshTokens.DidNotReceive().RotateAsync(
+            Arg.Any<string>(),
+            Arg.Any<string>(),
+            Arg.Any<DateTimeOffset>(),
+            Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task RefreshAsync_WhenTheAccountNoLongerExists_LeavesThePresentedTokenAlone()
+    {
+        _refreshTokens.FindActiveUserIdAsync(Arg.Any<string>(), Arg.Any<CancellationToken>())
+            .Returns(_userId);
+
+        _identity.FindByIdAsync(_userId, Arg.Any<CancellationToken>()).Returns(UserErrors.NotFound);
+
+        Result<AuthenticationTokens> result =
+            await _service.RefreshAsync("presented", CancellationToken.None);
+
+        result.IsError.ShouldBeTrue();
+        result.TopError.Code.ShouldBe(UserErrors.InvalidRefreshToken.Code);
+        result.TopError.Code.ShouldNotBe(UserErrors.NotFound.Code);
+
+        await _refreshTokens.DidNotReceive().RotateAsync(
+            Arg.Any<string>(),
+            Arg.Any<string>(),
+            Arg.Any<DateTimeOffset>(),
+            Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task RefreshAsync_WhenAnotherRequestWinsTheRotation_ReturnsTheGenericTokenError()
+    {
+        _refreshTokens.FindActiveUserIdAsync(Arg.Any<string>(), Arg.Any<CancellationToken>())
+            .Returns(_userId);
+
+        _identity.FindByIdAsync(_userId, Arg.Any<CancellationToken>()).Returns(_user);
+
         _refreshTokens.RotateAsync(
                 Arg.Any<string>(),
                 Arg.Any<string>(),
@@ -110,40 +163,18 @@ public sealed class AuthenticationServiceTests
                 Arg.Any<CancellationToken>())
             .Returns((Guid?)null);
 
-        Result<AuthenticationResponse> result =
-            await _service.RefreshAsync(new RefreshRequest("stale"), CancellationToken.None);
+        Result<AuthenticationTokens> result =
+            await _service.RefreshAsync("presented", CancellationToken.None);
 
         result.IsError.ShouldBeTrue();
         result.TopError.Code.ShouldBe(UserErrors.InvalidRefreshToken.Code);
-
-        await _identity.DidNotReceive().FindByIdAsync(Arg.Any<Guid>(), Arg.Any<CancellationToken>());
-    }
-
-    [Fact]
-    public async Task RefreshAsync_WhenTheAccountNoLongerExists_ReturnsTheGenericTokenError()
-    {
-        _refreshTokens.RotateAsync(
-                Arg.Any<string>(),
-                Arg.Any<string>(),
-                Arg.Any<DateTimeOffset>(),
-                Arg.Any<CancellationToken>())
-            .Returns(_userId);
-
-        _identity.FindByIdAsync(_userId, Arg.Any<CancellationToken>()).Returns(UserErrors.NotFound);
-
-        Result<AuthenticationResponse> result =
-            await _service.RefreshAsync(new RefreshRequest("presented"), CancellationToken.None);
-
-        result.IsError.ShouldBeTrue();
-        result.TopError.Code.ShouldBe(UserErrors.InvalidRefreshToken.Code);
-        result.TopError.Code.ShouldNotBe(UserErrors.NotFound.Code);
     }
 
     [Fact]
     public async Task LogoutAsync_WithAnyToken_RevokesTheHashAndSucceeds()
     {
         Result<Success> result =
-            await _service.LogoutAsync(new RefreshRequest("presented"), CancellationToken.None);
+            await _service.LogoutAsync("presented", CancellationToken.None);
 
         result.IsSuccess.ShouldBeTrue();
 
@@ -153,7 +184,7 @@ public sealed class AuthenticationServiceTests
     [Fact]
     public async Task RegisterAsync_DelegatesToTheAccountStore()
     {
-        RegisterRequest request = new("ada@example.com", "pw", "Ada", "Lovelace");
+        Registration request = new("ada@example.com", "pw", "Ada", "Lovelace");
         _identity.RegisterAsync(request, Arg.Any<CancellationToken>()).Returns(_userId);
 
         Result<Guid> result = await _service.RegisterAsync(request, CancellationToken.None);
