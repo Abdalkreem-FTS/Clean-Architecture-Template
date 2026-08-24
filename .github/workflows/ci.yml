@@ -2,12 +2,14 @@ name: CI
 
 on:
   push:
-    branches: [main]
+    branches: [main, develop]
   pull_request:
 
 jobs:
   build-and-test:
-    runs-on: ubuntu-latest
+    # Pinned rather than latest: the runner image moves, and a green build that turns red
+    # because GitHub rolled the label forward is the worst kind of failure to debug.
+    runs-on: ubuntu-24.04
 
     steps:
       - uses: actions/checkout@v5
@@ -16,15 +18,40 @@ jobs:
         with:
           dotnet-version: '10.0.x'
 
+      - uses: actions/cache@v4
+        with:
+          path: ~/.nuget/packages
+          key: nuget-${{ runner.os }}-${{ hashFiles('Directory.Packages.props') }}
+          restore-keys: nuget-${{ runner.os }}-
+
       - run: dotnet build -c Release
 
-      - name: Tests
-        run: |
-          dotnet run --project tests/CleanArchitecture.ArchitectureTests -c Release --no-build
-          dotnet run --project tests/CleanArchitecture.Application.UnitTests -c Release --no-build
-          dotnet run --project tests/CleanArchitecture.Api.IntegrationTests -c Release --no-build
+      # One step per suite, each running even if an earlier one failed, so a push reports every
+      # failure at once instead of only the first.
+      - name: Architecture tests
+        if: ${{ !cancelled() }}
+        run: dotnet test --project tests/CleanArchitecture.ArchitectureTests -c Release --no-build
 
-      - name: Smoke test
+      - name: Domain unit tests
+        if: ${{ !cancelled() }}
+        run: dotnet test --project tests/CleanArchitecture.Domain.UnitTests -c Release --no-build
+
+      - name: Application unit tests
+        if: ${{ !cancelled() }}
+        run: dotnet test --project tests/CleanArchitecture.Application.UnitTests -c Release --no-build
+
+      - name: Integration tests
+        if: ${{ !cancelled() }}
+        run: dotnet test --project tests/CleanArchitecture.Api.IntegrationTests -c Release --no-build
+
+  # Its own job so the image build runs alongside the test suites rather than after them.
+  smoke:
+    runs-on: ubuntu-24.04
+
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Compose up and probe readiness
         run: |
           docker compose up -d --build
           curl -fsS --retry 20 --retry-delay 3 --retry-all-errors http://localhost:8080/health/ready
