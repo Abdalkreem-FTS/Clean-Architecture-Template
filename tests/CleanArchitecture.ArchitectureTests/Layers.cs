@@ -13,9 +13,6 @@ internal static class Layers
 
     public static readonly Assembly Infrastructure = typeof(ApplicationUser).Assembly;
 
-    public static readonly Assembly Api = typeof(Program).Assembly;
-
-    public const string DomainNamespace = "CleanArchitecture.Domain";
     public const string ApplicationNamespace = "CleanArchitecture.Application";
     public const string InfrastructureNamespace = "CleanArchitecture.Infrastructure";
     public const string ApiNamespace = "CleanArchitecture.Api";
