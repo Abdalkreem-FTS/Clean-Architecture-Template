@@ -1,4 +1,3 @@
-using System;
 using System.Globalization;
 
 namespace CleanArchitecture.Api.IntegrationTests.Configuration;

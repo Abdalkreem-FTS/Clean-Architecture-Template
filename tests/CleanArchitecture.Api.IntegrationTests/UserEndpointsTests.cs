@@ -1,14 +1,9 @@
-using System;
-using System.Linq;
 using System.Net;
-using System.Net.Http;
 using System.Net.Http.Json;
-using System.Threading.Tasks;
 using CleanArchitecture.Api.IntegrationTests.Configuration;
 using CleanArchitecture.Domain.Users;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Shouldly;
-using Xunit;
 
 namespace CleanArchitecture.Api.IntegrationTests;
 
@@ -78,22 +73,59 @@ public sealed class UserEndpointsTests(ApiTestFactory factory) : BaseApiTest(fac
             stillValid.StatusCode.ShouldBe(HttpStatusCode.OK);
         }
 
-        HttpStatusCode expired = await PollForStatusAsync(
-            () => client.SendAsync(BearerRequest(HttpMethod.Get, Routes.Users.Me, payload.AccessToken), Ct),
-            HttpStatusCode.Unauthorized,
-            _pollBudget);
+        // ClockSkew is zero, so the token is refused the instant the wall clock passes its
+        // expiry. Waiting for that instant is deterministic; polling for it until a budget runs
+        // out only looks like it is.
+        await Task.Delay(payload.AccessTokenExpiresAtUtc - DateTimeOffset.UtcNow + _expiryMargin, Ct);
 
-        expired.ShouldBe(HttpStatusCode.Unauthorized);
+        using HttpRequestMessage after = BearerRequest(HttpMethod.Get, Routes.Users.Me, payload.AccessToken);
+        using HttpResponseMessage expired = await client.SendAsync(after, Ct);
+
+        expired.StatusCode.ShouldBe(HttpStatusCode.Unauthorized);
     }
 
     [Fact]
     public async Task GetMe_WithATokenSignedByAnotherKey_ReturnsUnauthorized()
     {
-        using HttpClient client = Authenticated(TestTokens.ForeignlySigned);
+        HttpClient client = Authenticated(TestTokens.ForeignlySigned);
 
         using HttpResponseMessage response = await client.GetAsync(Url(Routes.Users.Me), Ct);
 
         response.StatusCode.ShouldBe(HttpStatusCode.Unauthorized);
+    }
+
+    [Fact]
+    public async Task GetMe_WithATokenFromAnotherIssuer_ReturnsUnauthorized() =>
+        (await StatusOfTokenIssuedWithAsync(SettingKeys.JwtIssuer, ForeignIssuer))
+            .ShouldBe(HttpStatusCode.Unauthorized);
+
+    [Fact]
+    public async Task GetMe_WithATokenForAnotherAudience_ReturnsUnauthorized() =>
+        (await StatusOfTokenIssuedWithAsync(SettingKeys.JwtAudience, ForeignAudience))
+            .ShouldBe(HttpStatusCode.Unauthorized);
+
+    // Signs a token with the right key but the wrong issuer or audience, by asking a second host
+    // configured that way, then presents it to the real one. Without ValidateIssuer and
+    // ValidateAudience these would sail through, since the signature itself is valid.
+    private async Task<HttpStatusCode> StatusOfTokenIssuedWithAsync(string key, string value)
+    {
+        await using WebApplicationFactory<Program> foreign = FactoryWith((key, value));
+        using HttpClient issuer = foreign.CreateClient();
+
+        await RegisterAsync(issuer, TestUsers.Ada);
+
+        AuthPayload payload;
+
+        using (HttpResponseMessage login = await PostLoginAsync(issuer, TestUsers.Ada, TestUsers.Password))
+        {
+            login.StatusCode.ShouldBe(HttpStatusCode.OK);
+            payload = (await login.Content.ReadFromJsonAsync<AuthPayload>(Json, Ct))!;
+        }
+
+        using HttpRequestMessage request = BearerRequest(HttpMethod.Get, Routes.Users.Me, payload.AccessToken);
+        using HttpResponseMessage response = await Client.SendAsync(request, Ct);
+
+        return response.StatusCode;
     }
 
     [Fact]
@@ -281,5 +313,9 @@ public sealed class UserEndpointsTests(ApiTestFactory factory) : BaseApiTest(fac
 
     private const string ShortAccessTokenLifetime = "00:00:02";
 
-    private static readonly TimeSpan _pollBudget = TimeSpan.FromSeconds(15);
+    private const string ForeignIssuer = "someone-elses-api";
+
+    private const string ForeignAudience = "someone-elses-client";
+
+    private static readonly TimeSpan _expiryMargin = TimeSpan.FromMilliseconds(250);
 }

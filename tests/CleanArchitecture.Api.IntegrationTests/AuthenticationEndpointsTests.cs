@@ -71,6 +71,40 @@ public sealed class AuthenticationEndpointsTests(ApiTestFactory factory) : BaseA
     }
 
     [Fact]
+    public async Task Register_WithConcurrentRequestsForOneAddress_CreatesExactlyOneAccount()
+    {
+        const int concurrentAttempts = 8;
+
+        HttpResponseMessage[] responses = await Task.WhenAll(
+            Enumerable.Range(0, concurrentAttempts).Select(_ => Client.PostAsJsonAsync(
+                Url(Routes.Authentication.Register),
+                new
+                {
+                    email = TestUsers.Ada,
+                    password = TestUsers.Password,
+                    firstName = TestUsers.FirstName,
+                    lastName = TestUsers.LastName,
+                },
+                Ct)));
+
+        try
+        {
+            responses.Count(response => response.StatusCode == HttpStatusCode.Created).ShouldBe(1);
+            responses.Count(response => response.StatusCode == HttpStatusCode.Conflict)
+                .ShouldBe(concurrentAttempts - 1);
+        }
+        finally
+        {
+            foreach (HttpResponseMessage response in responses)
+            {
+                response.Dispose();
+            }
+        }
+
+        (await CountAccountsWithEmailAsync(TestUsers.Ada)).ShouldBe(1);
+    }
+
+    [Fact]
     public async Task Register_WithAMalformedAddress_ReturnsABadRequest()
     {
         using HttpResponseMessage response = await Client.PostAsJsonAsync(
@@ -291,6 +325,34 @@ public sealed class AuthenticationEndpointsTests(ApiTestFactory factory) : BaseA
     }
 
     [Fact]
+    public async Task Refresh_WithAnExpiredButUnrevokedToken_ReturnsUnauthorized()
+    {
+        await using WebApplicationFactory<Program> shortLived =
+            FactoryWith((SettingKeys.JwtRefreshTokenLifetime, ShortRefreshTokenLifetime));
+
+        using HttpClient client = shortLived.CreateClient();
+
+        await RegisterAsync(client, TestUsers.Ada);
+
+        AuthPayload payload;
+
+        using (HttpResponseMessage login = await PostLoginAsync(client, TestUsers.Ada, TestUsers.Password))
+        {
+            login.StatusCode.ShouldBe(HttpStatusCode.OK);
+            payload = (await login.Content.ReadFromJsonAsync<AuthPayload>(Json, Ct))!;
+        }
+
+        // Expiry is compared in SQL against the injected clock, so waiting past it is exact.
+        await Task.Delay(_shortRefreshTokenLifetimeSpan + _expiryMargin, Ct);
+
+        using HttpResponseMessage refreshed = await PostRefreshAsync(client, payload.RefreshToken);
+
+        refreshed.StatusCode.ShouldBe(HttpStatusCode.Unauthorized);
+
+        (await CountActiveRefreshTokensAsync()).ShouldBe(1);
+    }
+
+    [Fact]
     public async Task Refresh_WithAnUnknownToken_ReturnsUnauthorized()
     {
         using HttpResponseMessage response = await PostRefreshAsync(TestTokens.Unknown);
@@ -322,6 +384,12 @@ public sealed class AuthenticationEndpointsTests(ApiTestFactory factory) : BaseA
         response.StatusCode.ShouldBe(HttpStatusCode.NoContent);
     }
 
+    private const string ShortRefreshTokenLifetime = "00:00:02";
+
+    private static readonly TimeSpan _shortRefreshTokenLifetimeSpan = TimeSpan.FromSeconds(2);
+
+    private static readonly TimeSpan _expiryMargin = TimeSpan.FromMilliseconds(250);
+
     private static (string Key, string Value)[] SeedSettings =>
     [
         (SettingKeys.SeedAdminEmail, TestUsers.SeededAdmin),
@@ -330,7 +398,7 @@ public sealed class AuthenticationEndpointsTests(ApiTestFactory factory) : BaseA
 
     private async Task ExhaustFailedAttemptsAsync(string email)
     {
-        for (int attempt = 0; attempt < TestSettings.MaxFailedAccessAttempts; attempt++)
+        for (int attempt = 0; attempt < MaxFailedAccessAttempts; attempt++)
         {
             using HttpResponseMessage failed = await PostLoginAsync(email, TestUsers.WrongPassword);
         }

@@ -1,5 +1,3 @@
-using System;
-
 namespace CleanArchitecture.Api.IntegrationTests.Configuration;
 
 internal static class TestSettings
@@ -17,10 +15,6 @@ internal static class TestSettings
     public const string EnvironmentName = "Testing";
 
     public const string AuthenticationScheme = "Bearer";
-
-    public const int MaxFailedAccessAttempts = 5;
-
-    public static readonly Guid AdminRoleId = Guid.Parse("00000000-0000-0000-0000-000000000001");
 
     private static string FromEnvironment(string variable, string fallback) =>
         Environment.GetEnvironmentVariable(variable) is { Length: > 0 } value ? value : fallback;

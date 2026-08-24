@@ -1,15 +1,13 @@
-using System;
-using System.Net;
-using System.Net.Http;
 using System.Net.Http.Headers;
 using System.Net.Http.Json;
 using System.Text.Json;
-using System.Threading;
-using System.Threading.Tasks;
 using CleanArchitecture.Api.IntegrationTests.Configuration;
+using CleanArchitecture.Domain.Users;
+using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc.Testing;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Options;
 using Npgsql;
-using Xunit;
 
 namespace CleanArchitecture.Api.IntegrationTests;
 
@@ -24,6 +22,14 @@ public abstract class BaseApiTest(ApiTestFactory factory) : IAsyncLifetime
 
     protected static CancellationToken Ct => TestContext.Current.CancellationToken;
 
+    // Every client this test handed out, so none of them outlives the test that asked for one.
+    private readonly List<HttpClient> _clients = [];
+
+    // Read off the running application rather than restated here, so a change to the lockout
+    // policy in appsettings.json moves the test that exhausts it too.
+    protected int MaxFailedAccessAttempts =>
+        Factory.Services.GetRequiredService<IOptions<IdentityOptions>>().Value.Lockout.MaxFailedAccessAttempts;
+
     public ValueTask InitializeAsync()
     {
         Client = Factory.CreateClient();
@@ -33,7 +39,16 @@ public abstract class BaseApiTest(ApiTestFactory factory) : IAsyncLifetime
 
     public ValueTask DisposeAsync()
     {
+        foreach (HttpClient client in _clients)
+        {
+            client.Dispose();
+        }
+
+        _clients.Clear();
         Client.Dispose();
+
+        // Kept here, unlike in the sealed ApiTestFactory: this type can be inherited, so a
+        // derived test class that introduced a finalizer would need this call to exist (CA1816).
         GC.SuppressFinalize(this);
 
         return ValueTask.CompletedTask;
@@ -107,11 +122,15 @@ public abstract class BaseApiTest(ApiTestFactory factory) : IAsyncLifetime
         return new SignedInUser(userId, payload.AccessToken, payload.RefreshToken, Authenticated(payload.AccessToken));
     }
 
+    // The caller gets a client, not the job of disposing it — the test owns it and closes it
+    // when it ends.
     protected HttpClient Authenticated(string accessToken)
     {
         HttpClient client = Factory.CreateClient();
         client.DefaultRequestHeaders.Authorization =
             new AuthenticationHeaderValue(TestSettings.AuthenticationScheme, accessToken);
+
+        _clients.Add(client);
 
         return client;
     }
@@ -125,38 +144,18 @@ public abstract class BaseApiTest(ApiTestFactory factory) : IAsyncLifetime
         return request;
     }
 
-    protected static async Task<HttpStatusCode> PollForStatusAsync(
-        Func<Task<HttpResponseMessage>> send,
-        HttpStatusCode expected,
-        TimeSpan budget)
-    {
-        DateTimeOffset deadline = DateTimeOffset.UtcNow + budget;
-
-        while (true)
-        {
-            HttpStatusCode last;
-            using (HttpResponseMessage response = await send())
-            {
-                last = response.StatusCode;
-            }
-
-            if (last == expected || DateTimeOffset.UtcNow >= deadline)
-            {
-                return last;
-            }
-
-            await Task.Delay(TimeSpan.FromMilliseconds(100), Ct);
-        }
-    }
-
+    // Straight into the table on purpose: granting admin through the API needs an admin to
+    // already exist, and the suite truncates users between tests, so there never is one. Looked
+    // up by name rather than by the id V0003 happens to seed, so reseeding differently does not
+    // silently stop granting anything.
     protected Task GrantAdminAsync(Guid userId) => ExecuteAsync(
         """
         INSERT INTO user_roles (user_id, role_id)
-        VALUES (@user_id, @role_id)
+        SELECT @user_id, id FROM roles WHERE name = @role
         ON CONFLICT DO NOTHING
         """,
         ("user_id", userId),
-        ("role_id", TestSettings.AdminRoleId));
+        ("role", Roles.Admin));
 
     protected Task ClearLockoutAsync(string email) => ExecuteAsync(
         "UPDATE users SET lockout_end = NULL WHERE email = @email",
