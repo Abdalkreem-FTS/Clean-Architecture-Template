@@ -31,7 +31,7 @@
       Microsoft.Testing.Platform support built in, so a test project is a self-hosting
       executable and needs neither Microsoft.NET.Test.Sdk nor a VSTest adapter.
 
-      The opt-in itself lives in dotnet.config at the repository root — setting the older
+      The opt-in itself lives in global.json at the repository root — setting the older
       TestingPlatformDotnetTestSupport property here as well sends the SDK back down the
       VSTest path and fails the run.
     -->
