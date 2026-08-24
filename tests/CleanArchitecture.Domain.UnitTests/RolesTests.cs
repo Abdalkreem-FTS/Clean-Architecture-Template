@@ -1,8 +1,7 @@
 using CleanArchitecture.Domain.Users;
 using Shouldly;
-using Xunit;
 
-namespace CleanArchitecture.Application.UnitTests;
+namespace CleanArchitecture.Domain.UnitTests;
 
 public sealed class RolesTests
 {
