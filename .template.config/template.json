@@ -21,6 +21,14 @@
       "replaces": "dev-only-signing-key-not-for-any-real-environment",
       "parameters": { "defaultFormat": "N" },
       "description": "Gives each generated solution its own development signing key."
+    },
+
+    "composeSigningKey": {
+      "type": "generated",
+      "generator": "guid",
+      "replaces": "compose-only-signing-key-not-for-any-real-environment",
+      "parameters": { "defaultFormat": "N" },
+      "description": "compose.yaml carries its own key, so it needs its own symbol or every generated project would ship the same one."
     }
   },
 
