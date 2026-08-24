@@ -25,6 +25,6 @@ public static class UserErrors
     public static readonly Error InvalidRefreshToken =
         Error.Unauthorized("Users.InvalidRefreshToken", "That refresh token is not valid.");
 
-    public static Error IdentityFailure(string description) =>
-        Error.Validation("Users.IdentityFailure", description);
+    public static Error IdentityFailure(string code, string description) =>
+        Error.Validation($"Users.{code}", description);
 }

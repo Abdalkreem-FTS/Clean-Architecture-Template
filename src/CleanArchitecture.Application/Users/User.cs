@@ -1,6 +1,6 @@
 namespace CleanArchitecture.Application.Users;
 
-public sealed record UserResponse(
+public sealed record User(
     Guid Id,
     string Email,
     string FirstName,
@@ -8,5 +8,3 @@ public sealed record UserResponse(
     IReadOnlyList<string> Roles,
     DateTimeOffset CreatedAtUtc,
     DateTimeOffset? LastLoginAtUtc);
-
-public sealed record AssignRoleRequest(string Role);

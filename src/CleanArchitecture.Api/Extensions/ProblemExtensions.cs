@@ -11,9 +11,7 @@ public static class ProblemExtensions
             return Results.Problem();
         }
 
-        Error first = errors[0];
-
-        if (first.Type == ErrorType.Validation)
+        if (errors.TrueForAll(error => error.Type == ErrorType.Validation))
         {
             return Results.ValidationProblem(
                 errors.GroupBy(error => error.Code)
@@ -23,11 +21,22 @@ public static class ProblemExtensions
                 title: "One or more validation errors occurred.");
         }
 
+        Error primary = errors.First(error => error.Type != ErrorType.Validation);
+
+        var extensions = new Dictionary<string, object?> { ["code"] = primary.Code };
+
+        if (errors.Count > 1)
+        {
+            extensions["errors"] = errors
+                .Select(error => new ProblemError(error.Code, error.Description))
+                .ToArray();
+        }
+
         return Results.Problem(
-            title: Title(first.Type),
-            detail: first.Description,
-            statusCode: StatusCode(first.Type),
-            extensions: new Dictionary<string, object?> { ["code"] = first.Code });
+            title: Title(primary.Type),
+            detail: primary.Description,
+            statusCode: StatusCode(primary.Type),
+            extensions: extensions);
     }
 
     private static int StatusCode(ErrorType type) => type switch
@@ -49,4 +58,6 @@ public static class ProblemExtensions
         ErrorType.Conflict => "Conflict",
         _ => "Server error",
     };
+
+    public sealed record ProblemError(string Code, string Description);
 }

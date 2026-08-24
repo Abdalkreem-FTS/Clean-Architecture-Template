@@ -7,16 +7,16 @@ namespace CleanArchitecture.Application.Users;
 
 internal sealed class UserService(IIdentityService identityService, ICurrentUser currentUser) : IUserService
 {
-    public Task<Result<UserResponse>> GetCurrentAsync(CancellationToken cancellationToken) =>
+    public Task<Result<User>> GetCurrentAsync(CancellationToken cancellationToken) =>
         currentUser.UserId is not { } userId
-            ? Task.FromResult<Result<UserResponse>>(UserErrors.InvalidCredentials)
+            ? Task.FromResult<Result<User>>(UserErrors.InvalidCredentials)
             : identityService.FindByIdAsync(userId, cancellationToken);
 
-    public Task<Result<UserResponse>> GetByIdAsync(Guid userId, CancellationToken cancellationToken) =>
+    public Task<Result<User>> GetByIdAsync(Guid userId, CancellationToken cancellationToken) =>
         identityService.FindByIdAsync(userId, cancellationToken);
 
-    public Task<Result<PagedResponse<UserResponse>>> ListAsync(
-        PageRequest page,
+    public Task<Result<Paged<User>>> ListAsync(
+        PageQuery page,
         CancellationToken cancellationToken) =>
         identityService.ListAsync(page, cancellationToken);
 

@@ -1,48 +1,17 @@
-using System.ComponentModel;
-using System.Text.Json.Serialization;
-using CleanArchitecture.Domain.Common.Results.Abstractions;
-
 namespace CleanArchitecture.Domain.Common.Results;
 
 public static class Result
 {
     public static Success Success => default;
-    public static Created Created => default;
-    public static Deleted Deleted => default;
-    public static Updated Updated => default;
 }
 
-public sealed class Result<TValue> : IResult<TValue>
+public sealed class Result<TValue>
 {
     private readonly TValue? _value;
 
     private readonly List<Error>? _errors;
 
     public bool IsSuccess { get; }
-
-    [JsonConstructor]
-    [EditorBrowsable(EditorBrowsableState.Never)]
-    [Obsolete("For serializer only.", true)]
-    public Result(TValue? value, List<Error>? errors, bool isSuccess)
-    {
-        if (isSuccess)
-        {
-            _value = value ?? throw new ArgumentNullException(nameof(value));
-            _errors = [];
-            IsSuccess = true;
-        }
-        else
-        {
-            if (errors == null || errors.Count == 0)
-            {
-                throw new ArgumentException("Provide at least one error.", nameof(errors));
-            }
-
-            _errors = errors;
-            _value = default!;
-            IsSuccess = false;
-        }
-    }
 
     private Result(Error error)
     {
@@ -53,7 +22,7 @@ public sealed class Result<TValue> : IResult<TValue>
     {
         if (errors is null || errors.Count == 0)
         {
-            throw new ArgumentException("Cannot create an ErrorOr<TValue> from an empty collection of errors. Provide at least one error.", nameof(errors));
+            throw new ArgumentException("Provide at least one error.", nameof(errors));
         }
 
         _errors = errors;
@@ -77,9 +46,15 @@ public sealed class Result<TValue> : IResult<TValue>
 
     public List<Error> Errors => IsError ? _errors! : [];
 
-    public TValue Value => IsSuccess ? _value! : default!;
+    public TValue Value => IsSuccess
+        ? _value!
+        : throw new InvalidOperationException(
+            "This result is an error. Check IsSuccess before reading Value.");
 
-    public Error TopError => (_errors?.Count > 0) ? _errors[0] : default;
+    public Error TopError => IsError
+        ? _errors![0]
+        : throw new InvalidOperationException(
+            "This result is a success. Check IsError before reading TopError.");
 
     public TNextValue Match<TNextValue>(Func<TValue, TNextValue> onValue, Func<List<Error>, TNextValue> onError)
         => IsSuccess ? onValue(Value!) : onError(Errors);
@@ -95,6 +70,3 @@ public sealed class Result<TValue> : IResult<TValue>
 }
 
 public readonly record struct Success;
-public readonly record struct Created;
-public readonly record struct Deleted;
-public readonly record struct Updated;

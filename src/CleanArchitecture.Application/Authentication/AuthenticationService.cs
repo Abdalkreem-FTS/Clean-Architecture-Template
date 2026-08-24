@@ -10,15 +10,12 @@ internal sealed class AuthenticationService(
     ITokenService tokenService,
     IRefreshTokenStore refreshTokenService) : IAuthenticationService
 {
-    public Task<Result<Guid>> RegisterAsync(RegisterRequest request, CancellationToken cancellationToken) =>
-        identityService.RegisterAsync(request, cancellationToken);
+    public Task<Result<Guid>> RegisterAsync(Registration registration, CancellationToken cancellationToken) =>
+        identityService.RegisterAsync(registration, cancellationToken);
 
-    public async Task<Result<AuthenticationResponse>> LoginAsync(LoginRequest request, CancellationToken cancellationToken)
+    public async Task<Result<AuthenticationTokens>> LoginAsync(string email, string password, CancellationToken cancellationToken)
     {
-        Result<UserResponse> user = await identityService.AuthenticateAsync(
-            request.Email,
-            request.Password,
-            cancellationToken);
+        Result<User> user = await identityService.AuthenticateAsync(email, password, cancellationToken);
 
         if (user.IsError)
         {
@@ -36,24 +33,33 @@ internal sealed class AuthenticationService(
         return Respond(user.Value, refreshToken);
     }
 
-    public async Task<Result<AuthenticationResponse>> RefreshAsync(RefreshRequest request, CancellationToken cancellationToken)
+    public async Task<Result<AuthenticationTokens>> RefreshAsync(string refreshToken, CancellationToken cancellationToken)
     {
-        RefreshTokenPair replacement = tokenService.CreateRefreshToken();
+        string presented = tokenService.Hash(refreshToken);
 
-        Guid? userId = await refreshTokenService.RotateAsync(
-            tokenService.Hash(request.RefreshToken),
-            replacement.Hash,
-            replacement.ExpiresAtUtc,
-            cancellationToken);
+        Guid? holder = await refreshTokenService.FindActiveUserIdAsync(presented, cancellationToken);
 
-        if (userId is null)
+        if (holder is null)
         {
             return UserErrors.InvalidRefreshToken;
         }
 
-        Result<UserResponse> user = await identityService.FindByIdAsync(userId.Value, cancellationToken);
+        Result<User> user = await identityService.FindByIdAsync(holder.Value, cancellationToken);
 
         if (user.IsError)
+        {
+            return UserErrors.InvalidRefreshToken;
+        }
+
+        RefreshTokenPair replacement = tokenService.CreateRefreshToken();
+
+        Guid? rotated = await refreshTokenService.RotateAsync(
+            presented,
+            replacement.Hash,
+            replacement.ExpiresAtUtc,
+            cancellationToken);
+
+        if (rotated is null)
         {
             return UserErrors.InvalidRefreshToken;
         }
@@ -61,17 +67,17 @@ internal sealed class AuthenticationService(
         return Respond(user.Value, replacement);
     }
 
-    public async Task<Result<Success>> LogoutAsync(RefreshRequest request, CancellationToken cancellationToken)
+    public async Task<Result<Success>> LogoutAsync(string refreshToken, CancellationToken cancellationToken)
     {
-        await refreshTokenService.RevokeAsync(tokenService.Hash(request.RefreshToken), cancellationToken);
+        await refreshTokenService.RevokeAsync(tokenService.Hash(refreshToken), cancellationToken);
 
         return Result.Success;
     }
 
-    private AuthenticationResponse Respond(UserResponse user, RefreshTokenPair refreshToken)
+    private AuthenticationTokens Respond(User user, RefreshTokenPair refreshToken)
     {
-        AccessToken accessToken = tokenService.CreateAccessToken(user);
+        AccessToken accessToken = tokenService.CreateAccessToken(user.Id, user.Email, user.Roles);
 
-        return new AuthenticationResponse(user.Id, accessToken.Value, accessToken.ExpiresAtUtc, refreshToken.Raw);
+        return new AuthenticationTokens(user.Id, accessToken.Value, accessToken.ExpiresAtUtc, refreshToken.Raw);
     }
 }

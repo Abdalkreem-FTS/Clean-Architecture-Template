@@ -5,11 +5,11 @@ namespace CleanArchitecture.Application.Abstractions;
 
 public interface IAuthenticationService
 {
-    Task<Result<Guid>> RegisterAsync(RegisterRequest request, CancellationToken cancellationToken);
+    Task<Result<Guid>> RegisterAsync(Registration registration, CancellationToken cancellationToken);
 
-    Task<Result<AuthenticationResponse>> LoginAsync(LoginRequest request, CancellationToken cancellationToken);
+    Task<Result<AuthenticationTokens>> LoginAsync(string email, string password, CancellationToken cancellationToken);
 
-    Task<Result<AuthenticationResponse>> RefreshAsync(RefreshRequest request, CancellationToken cancellationToken);
+    Task<Result<AuthenticationTokens>> RefreshAsync(string refreshToken, CancellationToken cancellationToken);
 
-    Task<Result<Success>> LogoutAsync(RefreshRequest request, CancellationToken cancellationToken);
+    Task<Result<Success>> LogoutAsync(string refreshToken, CancellationToken cancellationToken);
 }

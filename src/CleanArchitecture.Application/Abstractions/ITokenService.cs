@@ -1,10 +1,8 @@
-using CleanArchitecture.Application.Users;
-
 namespace CleanArchitecture.Application.Abstractions;
 
 public interface ITokenService
 {
-    AccessToken CreateAccessToken(UserResponse user);
+    AccessToken CreateAccessToken(Guid userId, string email, IReadOnlyList<string> roles);
 
     RefreshTokenPair CreateRefreshToken();
 

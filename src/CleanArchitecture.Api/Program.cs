@@ -1,9 +1,12 @@
 using CleanArchitecture.Api.Endpoints;
-using CleanArchitecture.Api.Middleware;
+using CleanArchitecture.Api.Handlers;
 using CleanArchitecture.Application;
 using CleanArchitecture.Infrastructure.Persistence;
 using CleanArchitecture.Infrastructure;
+using EvolveDb;
+using FluentValidation;
 using Microsoft.AspNetCore.Diagnostics.HealthChecks;
+using Microsoft.EntityFrameworkCore;
 using Scalar.AspNetCore;
 using Serilog;
 
@@ -16,13 +19,43 @@ builder.Services
     .AddApplication()
     .AddInfrastructure(builder.Configuration);
 
+// The validators live here now, next to the request records they validate.
+builder.Services.AddValidatorsFromAssembly(typeof(Program).Assembly, includeInternalTypes: true);
+
 builder.Services.AddExceptionHandler<GlobalExceptionHandler>();
 builder.Services.AddProblemDetails();
 builder.Services.AddOpenApi();
 
 WebApplication app = builder.Build();
 
-await app.Services.MigrateDatabaseAsync();
+// Schema first, then the first administrator. Both run in process before the app serves
+// anything, so the database has to be up and the connection's user needs DDL rights.
+await using (AsyncServiceScope scope = app.Services.CreateAsyncScope())
+{
+    AppDbContext database = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+    Microsoft.Extensions.Logging.ILogger logger =
+        scope.ServiceProvider.GetRequiredService<ILoggerFactory>().CreateLogger("Migrations");
+
+    var evolve = new Evolve(
+        database.Database.GetDbConnection(),
+        message => logger.LogInformation("Evolve: {Message}", message))
+    {
+        // Beside the app rather than the working directory, so it does not matter where the
+        // process was launched from.
+        Locations = [Path.Combine(AppContext.BaseDirectory, "Migrations")],
+        MetadataTableName = "schema_changelog",
+
+        // Takes an advisory lock, so two instances starting together cannot both migrate.
+        EnableClusterMode = true,
+        IsEraseDisabled = true,
+    };
+
+    evolve.Migrate();
+
+    logger.LogInformation("Database migration complete. {Applied} script(s) applied.", evolve.NbMigration);
+}
+
+await app.Services.SeedAdministratorAsync();
 
 app.UseExceptionHandler();
 app.UseSerilogRequestLogging();

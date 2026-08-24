@@ -1,4 +1,6 @@
+using CleanArchitecture.Api.Contracts;
 using CleanArchitecture.Api.Extensions;
+using CleanArchitecture.Api.Filters;
 using CleanArchitecture.Application.Abstractions;
 using CleanArchitecture.Application.Common;
 using CleanArchitecture.Application.Users;
@@ -17,9 +19,11 @@ public static class UserEndpoints
 
         group.MapGet("/me", async (IUserService users, CancellationToken cancellationToken) =>
             {
-                Result<UserResponse> result = await users.GetCurrentAsync(cancellationToken);
+                Result<User> result = await users.GetCurrentAsync(cancellationToken);
 
-                return result.Match(Results.Ok, errors => errors.ToProblem());
+                return result.Match(
+                    user => Results.Ok(UserResponse.From(user)),
+                    errors => errors.ToProblem());
             })
             .WithSummary("The signed-in user's own record")
             .Produces<UserResponse>()
@@ -28,14 +32,16 @@ public static class UserEndpoints
         group.MapGet("", async (
                 int? page,
                 int? pageSize,
-                IUserService users,
+                IUserService userService,
                 CancellationToken cancellationToken) =>
             {
-                Result<PagedResponse<UserResponse>> result = await users.ListAsync(
-                    PageRequest.Of(page, pageSize),
+                Result<Paged<User>> result = await userService.ListAsync(
+                    PageQuery.Of(page, pageSize),
                     cancellationToken);
 
-                return result.Match(Results.Ok, errors => errors.ToProblem());
+                return result.Match(
+                    users => Results.Ok(UserResponse.From(users)),
+                    errors => errors.ToProblem());
             })
             .WithSummary("A page of users")
             .WithDescription(
@@ -50,9 +56,11 @@ public static class UserEndpoints
                 IUserService users,
                 CancellationToken cancellationToken) =>
             {
-                Result<UserResponse> result = await users.GetByIdAsync(id, cancellationToken);
+                Result<User> result = await users.GetByIdAsync(id, cancellationToken);
 
-                return result.Match(Results.Ok, errors => errors.ToProblem());
+                return result.Match(
+                    user => Results.Ok(UserResponse.From(user)),
+                    errors => errors.ToProblem());
             })
             .WithSummary("One user by id")
             .RequireAuthorization(policy => policy.RequireRole(Roles.Admin))

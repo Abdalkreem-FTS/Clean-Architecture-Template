@@ -1,5 +1,4 @@
 using System.Text;
-using System;
 using CleanArchitecture.Application.Abstractions;
 using CleanArchitecture.Infrastructure.Authentication;
 using CleanArchitecture.Infrastructure.Identity;
@@ -9,11 +8,12 @@ using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.IdentityModel.JsonWebTokens;
 using Microsoft.IdentityModel.Tokens;
 
 namespace CleanArchitecture.Infrastructure;
 
-public static class DependencyInjection
+public static class ServiceCollectionExtensions
 {
     public const string ConnectionStringName = "Database";
 
@@ -25,7 +25,6 @@ public static class DependencyInjection
             ?? throw new InvalidOperationException(
                 $"Connection string '{ConnectionStringName}' is not configured.");
 
-        services.Configure<DatabaseOptions>(options => options.ConnectionString = connectionString);
         services.Configure<SeedOptions>(configuration.GetSection(SeedOptions.SectionName));
 
         services.AddSingleton(TimeProvider.System);
@@ -35,7 +34,7 @@ public static class DependencyInjection
         AddIdentity(services, configuration);
         AddAuthentication(services, configuration);
 
-        services.AddScoped<DatabaseMigrator>();
+        services.AddScoped<AdministratorSeeder>();
 
         services.AddHealthChecks().AddCheck<DatabaseHealthCheck>("database", tags: ["ready"]);
 
@@ -83,6 +82,11 @@ public static class DependencyInjection
             .AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
             .AddJwtBearer(options =>
             {
+                // Off, so claims are read under the names they were issued with. The default
+                // rewrites "sub" to a long ClaimTypes URI, which leaves the token saying one
+                // thing and the code reading another.
+                options.MapInboundClaims = false;
+
                 options.TokenValidationParameters = new TokenValidationParameters
                 {
                     ValidateIssuer = true,
@@ -93,6 +97,11 @@ public static class DependencyInjection
                     ValidAudience = jwt.Audience,
                     IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwt.SigningKey)),
                     ClockSkew = TimeSpan.Zero,
+
+                    // Tells ClaimsPrincipal.IsInRole — and therefore RequireRole — which claim
+                    // carries the roles, now that it is no longer the ClaimTypes default.
+                    NameClaimType = JwtRegisteredClaimNames.Sub,
+                    RoleClaimType = JwtOptions.RoleClaimType,
                 };
             });
 

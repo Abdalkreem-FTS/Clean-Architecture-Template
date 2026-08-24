@@ -36,6 +36,4 @@ public readonly record struct Error
     public static Error Forbidden(string code = nameof(Forbidden), string description = "Forbidden error")
         => new(code, description, ErrorType.Forbidden);
 
-    public static Error Create(int type, string code, string description)
-        => new(code, description, (ErrorType)type);
 }

@@ -9,7 +9,6 @@ COPY src/CleanArchitecture.Api/CleanArchitecture.Api.csproj src/CleanArchitectur
 RUN dotnet restore src/CleanArchitecture.Api/CleanArchitecture.Api.csproj
 
 COPY src/ src/
-COPY db/ db/
 RUN dotnet publish src/CleanArchitecture.Api/CleanArchitecture.Api.csproj -c Release -o /app --no-restore
 
 FROM mcr.microsoft.com/dotnet/aspnet:10.0 AS final

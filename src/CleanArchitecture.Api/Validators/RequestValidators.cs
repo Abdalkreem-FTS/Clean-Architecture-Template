@@ -1,7 +1,7 @@
-using CleanArchitecture.Application.Users;
+using CleanArchitecture.Api.Contracts;
 using FluentValidation;
 
-namespace CleanArchitecture.Application.Authentication;
+namespace CleanArchitecture.Api.Validators;
 
 internal sealed class RegisterRequestValidator : AbstractValidator<RegisterRequest>
 {

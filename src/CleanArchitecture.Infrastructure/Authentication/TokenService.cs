@@ -1,11 +1,7 @@
-using System.Collections.Generic;
-using System.Linq;
 using System.Security.Claims;
 using System.Security.Cryptography;
 using System.Text;
-using System;
 using CleanArchitecture.Application.Abstractions;
-using CleanArchitecture.Application.Users;
 using CleanArchitecture.Domain.Common;
 using Microsoft.Extensions.Options;
 using Microsoft.IdentityModel.JsonWebTokens;
@@ -17,19 +13,19 @@ internal sealed class TokenService(IOptions<JwtOptions> options, TimeProvider cl
 {
     private readonly JwtOptions _options = options.Value;
 
-    public AccessToken CreateAccessToken(UserResponse user)
+    public AccessToken CreateAccessToken(Guid userId, string email, IReadOnlyList<string> roles)
     {
         DateTimeOffset issuedAt = clock.GetUtcNow();
         DateTimeOffset expiresAt = issuedAt.Add(_options.AccessTokenLifetime);
 
         var claims = new List<Claim>
         {
-            new(JwtRegisteredClaimNames.Sub, user.Id.ToString()),
-            new(JwtRegisteredClaimNames.Email, user.Email),
+            new(JwtRegisteredClaimNames.Sub, userId.ToString()),
+            new(JwtRegisteredClaimNames.Email, email),
             new(JwtRegisteredClaimNames.Jti, Ids.New().ToString()),
         };
 
-        claims.AddRange(user.Roles.Select(role => new Claim(ClaimTypes.Role, role)));
+        claims.AddRange(roles.Select(role => new Claim(JwtOptions.RoleClaimType, role)));
 
         var descriptor = new SecurityTokenDescriptor
         {

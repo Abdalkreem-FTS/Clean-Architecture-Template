@@ -1,4 +1,6 @@
+using CleanArchitecture.Api.Contracts;
 using CleanArchitecture.Api.Extensions;
+using CleanArchitecture.Api.Filters;
 using CleanArchitecture.Application.Abstractions;
 using CleanArchitecture.Application.Authentication;
 using CleanArchitecture.Domain.Common.Results;
@@ -41,31 +43,37 @@ public static class AuthenticationEndpoints
 
     private static async Task<IResult> Logout(RefreshRequest request, IAuthenticationService authenticationService, CancellationToken cancellationToken)
     {
-        Result<Success> result = await authenticationService.LogoutAsync(request, cancellationToken);
+        Result<Success> result = await authenticationService.LogoutAsync(request.RefreshToken, cancellationToken);
 
         return result.Match(_ => Results.NoContent(), errors => errors.ToProblem());
     }
 
     private static async Task<IResult> Refresh(RefreshRequest request, IAuthenticationService authenticationService, CancellationToken cancellationToken)
     {
-        Result<AuthenticationResponse> result = await authenticationService.RefreshAsync(request, cancellationToken);
+        Result<AuthenticationTokens> result =
+            await authenticationService.RefreshAsync(request.RefreshToken, cancellationToken);
 
-        return result.Match(Results.Ok, errors => errors.ToProblem());
+        return result.Match(
+            tokens => Results.Ok(AuthenticationResponse.From(tokens)),
+            errors => errors.ToProblem());
     }
 
     private static async Task<IResult> Login(LoginRequest request, IAuthenticationService authenticationService, CancellationToken cancellationToken)
     {
-        Result<AuthenticationResponse> result = await authenticationService.LoginAsync(request, cancellationToken);
+        Result<AuthenticationTokens> result =
+            await authenticationService.LoginAsync(request.Email, request.Password, cancellationToken);
 
-        return result.Match(Results.Ok, errors => errors.ToProblem());
+        return result.Match(
+            tokens => Results.Ok(AuthenticationResponse.From(tokens)),
+            errors => errors.ToProblem());
     }
 
     private static async Task<IResult> Register(RegisterRequest request, IAuthenticationService authenticationService, CancellationToken cancellationToken)
     {
-        Result<Guid> result = await authenticationService.RegisterAsync(request, cancellationToken);
+        Result<Guid> result = await authenticationService.RegisterAsync(request.ToRegistration(), cancellationToken);
 
-        return result.Match(id => Results.Created($"/api/users/{id}", new RegisteredResponse(id)), errors => errors.ToProblem());
+        return result.Match(
+            id => Results.Created($"/api/users/{id}", new RegisteredResponse(id)),
+            errors => errors.ToProblem());
     }
-
-    private sealed record RegisteredResponse(Guid Id);
 }

@@ -1,57 +1,22 @@
-using System.Linq;
-using System.Threading.Tasks;
-using System.Threading;
-using System;
 using CleanArchitecture.Domain.Common;
 using CleanArchitecture.Domain.Users;
 using CleanArchitecture.Infrastructure.Identity;
-using EvolveDb;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
-using Npgsql;
 
 namespace CleanArchitecture.Infrastructure.Persistence;
 
-public sealed class DatabaseMigrator(
-    IOptions<DatabaseOptions> databaseOptions,
+// Creating the first administrator cannot go through the API, since granting the admin role
+// needs an admin. Leave Seed:AdminPassword empty to skip it.
+public sealed class AdministratorSeeder(
     IOptions<SeedOptions> seedOptions,
     UserManager<ApplicationUser> users,
     TimeProvider clock,
-    ILogger<DatabaseMigrator> logger)
+    ILogger<AdministratorSeeder> logger)
 {
-    public const string MetadataTableName = "schema_changelog";
-
-    private const string EmbeddedResourcePrefix = "CleanArchitecture.Infrastructure.Migrations";
-
     public async Task RunAsync(CancellationToken cancellationToken = default)
-    {
-        Migrate();
-
-        await SeedAdministratorAsync(cancellationToken);
-    }
-
-    private void Migrate()
-    {
-        using NpgsqlConnection connection = new(databaseOptions.Value.ConnectionString);
-
-        var evolve = new Evolve(connection, message => logger.LogInformation("Evolve: {Message}", message))
-        {
-            EmbeddedResourceAssemblies = [typeof(DatabaseMigrator).Assembly],
-            EmbeddedResourceFilters = [EmbeddedResourcePrefix],
-            MetadataTableName = MetadataTableName,
-            EnableClusterMode = true,
-            IsEraseDisabled = true,
-            MustEraseOnValidationError = false,
-        };
-
-        evolve.Migrate();
-
-        logger.LogInformation("Database migration complete. {Applied} script(s) applied.", evolve.NbMigration);
-    }
-
-    private async Task SeedAdministratorAsync(CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();
 
@@ -97,28 +62,14 @@ public sealed class DatabaseMigrator(
     }
 }
 
-public static class DatabaseMigratorExtensions
+public static class AdministratorSeederExtensions
 {
-    public static async Task MigrateDatabaseAsync(
+    public static async Task SeedAdministratorAsync(
         this IServiceProvider services,
         CancellationToken cancellationToken = default)
     {
         await using AsyncServiceScope scope = services.CreateAsyncScope();
 
-        await scope.ServiceProvider.GetRequiredService<DatabaseMigrator>().RunAsync(cancellationToken);
+        await scope.ServiceProvider.GetRequiredService<AdministratorSeeder>().RunAsync(cancellationToken);
     }
-}
-
-public sealed class DatabaseOptions
-{
-    public string ConnectionString { get; set; } = string.Empty;
-}
-
-public sealed class SeedOptions
-{
-    public const string SectionName = "Seed";
-
-    public string? AdminEmail { get; set; }
-
-    public string? AdminPassword { get; set; }
 }

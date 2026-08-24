@@ -1,4 +1,3 @@
-using System;
 using CleanArchitecture.Infrastructure.Identity;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
@@ -14,6 +13,12 @@ internal sealed class ApplicationUserConfiguration : IEntityTypeConfiguration<Ap
 
         builder.Property(user => user.FirstName).HasMaxLength(ApplicationUser.MaxNameLength).IsRequired();
         builder.Property(user => user.LastName).HasMaxLength(ApplicationUser.MaxNameLength).IsRequired();
+
+        // Identity's own index on this column is not unique. RequireUniqueEmail is on, so the
+        // model says here what the schema enforces.
+        builder.HasIndex(user => user.NormalizedEmail)
+            .IsUnique()
+            .HasDatabaseName("ix_users_normalized_email");
     }
 }
 
