@@ -1,21 +1,25 @@
 using CleanArchitecture.Application.Abstractions;
-using CleanArchitecture.Application.Users;
 using CleanArchitecture.Domain.Common.Results;
 using CleanArchitecture.Domain.Users;
 
 namespace CleanArchitecture.Application.Authentication;
 
 internal sealed class AuthenticationService(
-    IIdentityService identityService,
+    IUserAccountService accounts,
     ITokenService tokenService,
     IRefreshTokenStore refreshTokenService) : IAuthenticationService
 {
     public Task<Result<Guid>> RegisterAsync(Registration registration, CancellationToken cancellationToken) =>
-        identityService.RegisterAsync(registration, cancellationToken);
+        accounts.RegisterAsync(
+            registration.Email,
+            registration.Password,
+            registration.FirstName,
+            registration.LastName,
+            cancellationToken);
 
     public async Task<Result<AuthenticationTokens>> LoginAsync(string email, string password, CancellationToken cancellationToken)
     {
-        Result<User> user = await identityService.AuthenticateAsync(email, password, cancellationToken);
+        Result<User> user = await accounts.AuthenticateAsync(email, password, cancellationToken);
 
         if (user.IsError)
         {
@@ -44,7 +48,7 @@ internal sealed class AuthenticationService(
             return UserErrors.InvalidRefreshToken;
         }
 
-        Result<User> user = await identityService.FindByIdAsync(holder.Value, cancellationToken);
+        Result<User> user = await accounts.FindByIdAsync(holder.Value, cancellationToken);
 
         if (user.IsError)
         {

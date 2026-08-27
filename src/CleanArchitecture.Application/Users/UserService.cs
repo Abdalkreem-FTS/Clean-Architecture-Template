@@ -2,26 +2,43 @@ using CleanArchitecture.Application.Abstractions;
 using CleanArchitecture.Application.Common;
 using CleanArchitecture.Domain.Common.Results;
 using CleanArchitecture.Domain.Users;
+using DomainUser = CleanArchitecture.Domain.Users.User;
 
 namespace CleanArchitecture.Application.Users;
 
-internal sealed class UserService(IIdentityService identityService, ICurrentUser currentUser) : IUserService
+internal sealed class UserService(IUserAccountService accounts, ICurrentUser currentUser) : IUserService
 {
     public Task<Result<User>> GetCurrentAsync(CancellationToken cancellationToken) =>
         currentUser.UserId is not { } userId
             ? Task.FromResult<Result<User>>(UserErrors.InvalidCredentials)
-            : identityService.FindByIdAsync(userId, cancellationToken);
+            : GetByIdAsync(userId, cancellationToken);
 
-    public Task<Result<User>> GetByIdAsync(Guid userId, CancellationToken cancellationToken) =>
-        identityService.FindByIdAsync(userId, cancellationToken);
+    public async Task<Result<User>> GetByIdAsync(Guid userId, CancellationToken cancellationToken)
+    {
+        Result<DomainUser> user = await accounts.FindByIdAsync(userId, cancellationToken);
 
-    public Task<Result<Paged<User>>> ListAsync(
+        if (user.IsError)
+        {
+            return user.Errors;
+        }
+
+        return ToResponse(user.Value);
+    }
+
+    public async Task<Result<Paged<User>>> ListAsync(
         PageQuery page,
-        CancellationToken cancellationToken) =>
-        identityService.ListAsync(page, cancellationToken);
+        CancellationToken cancellationToken)
+    {
+        UserPage result = await accounts.ListAsync(page.Skip, page.Size, cancellationToken);
+
+        return new Paged<User>([.. result.Items.Select(ToResponse)], page.Number, page.Size, result.TotalCount);
+    }
 
     public Task<Result<Success>> AssignRoleAsync(Guid userId, string role, CancellationToken cancellationToken) =>
         !Roles.IsKnown(role)
             ? Task.FromResult<Result<Success>>(UserErrors.RoleNotFound)
-            : identityService.AssignRoleAsync(userId, role.ToLowerInvariant(), cancellationToken);
+            : accounts.AssignRoleAsync(userId, role.ToLowerInvariant(), cancellationToken);
+
+    private static User ToResponse(DomainUser user) =>
+        new(user.Id, user.Email, user.FirstName, user.LastName, user.Roles, user.CreatedAtUtc, user.LastLoginAtUtc);
 }

@@ -6,7 +6,7 @@ using CleanArchitecture.Application.Authentication;
 using CleanArchitecture.Application.Common;
 using CleanArchitecture.Application.Users;
 using CleanArchitecture.Domain.Common.Results;
-using CleanArchitecture.Domain.Users;
+using Roles = CleanArchitecture.Domain.Users.Roles;
 
 namespace CleanArchitecture.Api.Endpoints;
 

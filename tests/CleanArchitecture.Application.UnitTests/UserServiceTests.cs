@@ -4,18 +4,20 @@ using CleanArchitecture.Domain.Common.Results;
 using CleanArchitecture.Domain.Users;
 using NSubstitute;
 using Shouldly;
+using UserDto = CleanArchitecture.Application.Users.User;
+using DomainUser = CleanArchitecture.Domain.Users.User;
 
 namespace CleanArchitecture.Application.UnitTests;
 
 public sealed class UserServiceTests
 {
-    private readonly IIdentityService _identity = Substitute.For<IIdentityService>();
+    private readonly IUserAccountService _accounts = Substitute.For<IUserAccountService>();
     private readonly ICurrentUser _currentUser = Substitute.For<ICurrentUser>();
     private readonly UserService _service;
 
     private static readonly Guid _userId = Guid.Parse("11111111-1111-1111-1111-111111111111");
 
-    public UserServiceTests() => _service = new UserService(_identity, _currentUser);
+    public UserServiceTests() => _service = new UserService(_accounts, _currentUser);
 
     [Fact]
     public async Task AssignRoleAsync_WithAnUnknownRole_RefusesWithoutTouchingTheStore()
@@ -25,7 +27,7 @@ public sealed class UserServiceTests
         result.IsError.ShouldBeTrue();
         result.TopError.Code.ShouldBe(UserErrors.RoleNotFound.Code);
 
-        await _identity.DidNotReceive().AssignRoleAsync(
+        await _accounts.DidNotReceive().AssignRoleAsync(
             Arg.Any<Guid>(),
             Arg.Any<string>(),
             Arg.Any<CancellationToken>());
@@ -37,24 +39,31 @@ public sealed class UserServiceTests
     [InlineData("admin")]
     public async Task AssignRoleAsync_WithAKnownRoleInAnyCase_NormalisesItToLowercase(string role)
     {
-        _identity.AssignRoleAsync(_userId, Roles.Admin, Arg.Any<CancellationToken>())
+        _accounts.AssignRoleAsync(_userId, Roles.Admin, Arg.Any<CancellationToken>())
             .Returns(Result.Success);
 
         Result<Success> result = await _service.AssignRoleAsync(_userId, role, CancellationToken.None);
 
         result.IsSuccess.ShouldBeTrue();
 
-        await _identity.Received(1).AssignRoleAsync(_userId, Roles.Admin, Arg.Any<CancellationToken>());
+        await _accounts.Received(1).AssignRoleAsync(_userId, Roles.Admin, Arg.Any<CancellationToken>());
     }
 
     [Fact]
     public async Task GetCurrentAsync_WithAnAuthenticatedCaller_ReadsThatUser()
     {
         _currentUser.UserId.Returns(_userId);
-        _identity.FindByIdAsync(_userId, Arg.Any<CancellationToken>())
-            .Returns(new User(_userId, "ada@example.com", "Ada", "Lovelace", [Roles.User], DateTimeOffset.UnixEpoch, null));
+        _accounts.FindByIdAsync(_userId, Arg.Any<CancellationToken>())
+            .Returns(DomainUser.FromStorage(
+                _userId,
+                "ada@example.com",
+                "Ada",
+                "Lovelace",
+                [Roles.User],
+                DateTimeOffset.UnixEpoch,
+                null));
 
-        Result<User> result = await _service.GetCurrentAsync(CancellationToken.None);
+        Result<UserDto> result = await _service.GetCurrentAsync(CancellationToken.None);
 
         result.IsSuccess.ShouldBeTrue();
         result.Value.Id.ShouldBe(_userId);
@@ -65,10 +74,10 @@ public sealed class UserServiceTests
     {
         _currentUser.UserId.Returns((Guid?)null);
 
-        Result<User> result = await _service.GetCurrentAsync(CancellationToken.None);
+        Result<UserDto> result = await _service.GetCurrentAsync(CancellationToken.None);
 
         result.IsError.ShouldBeTrue();
 
-        await _identity.DidNotReceive().FindByIdAsync(Arg.Any<Guid>(), Arg.Any<CancellationToken>());
+        await _accounts.DidNotReceive().FindByIdAsync(Arg.Any<Guid>(), Arg.Any<CancellationToken>());
     }
 }

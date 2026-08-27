@@ -4,6 +4,7 @@ using CleanArchitecture.Api.Filters;
 using CleanArchitecture.Application.Abstractions;
 using CleanArchitecture.Application.Authentication;
 using CleanArchitecture.Domain.Common.Results;
+using Microsoft.AspNetCore.Mvc;
 
 namespace CleanArchitecture.Api.Endpoints;
 
@@ -35,7 +36,12 @@ public static class AuthenticationEndpoints
             .Produces(StatusCodes.Status204NoContent);
     }
 
-    private static async Task<IResult> Logout(RefreshRequest request, IAuthenticationService authenticationService, CancellationToken cancellationToken)
+    // DELETE does not infer a complex parameter as the body the way POST/PUT do, so this has to
+    // be explicit or the app fails to start.
+    private static async Task<IResult> Logout(
+        [FromBody] RefreshRequest request,
+        IAuthenticationService authenticationService,
+        CancellationToken cancellationToken)
     {
         Result<Success> result = await authenticationService.LogoutAsync(request.RefreshToken, cancellationToken);
 

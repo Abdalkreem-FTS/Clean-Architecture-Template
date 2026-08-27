@@ -1,5 +1,6 @@
 using System.Text;
 using CleanArchitecture.Application.Abstractions;
+using CleanArchitecture.Domain.Users;
 using CleanArchitecture.Infrastructure.Authentication;
 using CleanArchitecture.Infrastructure.Identity;
 using CleanArchitecture.Infrastructure.Persistence;
@@ -38,7 +39,7 @@ public static class ServiceCollectionExtensions
 
         services.AddHealthChecks().AddCheck<DatabaseHealthCheck>("database", tags: ["ready"]);
 
-        services.AddScoped<IIdentityService, IdentityService>();
+        services.AddScoped<IUserRepository, UserRepository>();
         services.AddScoped<IRefreshTokenStore, RefreshTokenStore>();
         services.AddScoped<ICurrentUser, CurrentUser>();
 

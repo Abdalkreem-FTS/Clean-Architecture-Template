@@ -9,7 +9,7 @@ internal static class Layers
 {
     public static readonly Assembly Domain = typeof(Ids).Assembly;
 
-    public static readonly Assembly Application = typeof(IIdentityService).Assembly;
+    public static readonly Assembly Application = typeof(IAuthenticationService).Assembly;
 
     public static readonly Assembly Infrastructure = typeof(ApplicationUser).Assembly;
 

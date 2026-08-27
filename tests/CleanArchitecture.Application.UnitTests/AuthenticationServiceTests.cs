@@ -1,6 +1,5 @@
 using CleanArchitecture.Application.Abstractions;
 using CleanArchitecture.Application.Authentication;
-using CleanArchitecture.Application.Users;
 using CleanArchitecture.Domain.Common.Results;
 using CleanArchitecture.Domain.Users;
 using NSubstitute;
@@ -10,14 +9,14 @@ namespace CleanArchitecture.Application.UnitTests;
 
 public sealed class AuthenticationServiceTests
 {
-    private readonly IIdentityService _identity = Substitute.For<IIdentityService>();
+    private readonly IUserAccountService _accounts = Substitute.For<IUserAccountService>();
     private readonly ITokenService _tokens = Substitute.For<ITokenService>();
     private readonly IRefreshTokenStore _refreshTokens = Substitute.For<IRefreshTokenStore>();
     private readonly AuthenticationService _service;
 
     private static readonly Guid _userId = Guid.Parse("11111111-1111-1111-1111-111111111111");
 
-    private static readonly User _user = new(
+    private static readonly User _user = User.FromStorage(
         _userId,
         "ada@example.com",
         "Ada",
@@ -36,13 +35,13 @@ public sealed class AuthenticationServiceTests
 
         _tokens.Hash(Arg.Any<string>()).Returns(call => $"hash-of-{call.Arg<string>()}");
 
-        _service = new AuthenticationService(_identity, _tokens, _refreshTokens);
+        _service = new AuthenticationService(_accounts, _tokens, _refreshTokens);
     }
 
     [Fact]
     public async Task LoginAsync_WithValidCredentials_IssuesARefreshTokenForThatUser()
     {
-        _identity.AuthenticateAsync("ada@example.com", "pw", Arg.Any<CancellationToken>())
+        _accounts.AuthenticateAsync("ada@example.com", "pw", Arg.Any<CancellationToken>())
             .Returns(_user);
 
         Result<AuthenticationTokens> result =
@@ -63,7 +62,7 @@ public sealed class AuthenticationServiceTests
     [Fact]
     public async Task LoginAsync_WithBadCredentials_IssuesNothing()
     {
-        _identity.AuthenticateAsync(Arg.Any<string>(), Arg.Any<string>(), Arg.Any<CancellationToken>())
+        _accounts.AuthenticateAsync(Arg.Any<string>(), Arg.Any<string>(), Arg.Any<CancellationToken>())
             .Returns(UserErrors.InvalidCredentials);
 
         Result<AuthenticationTokens> result =
@@ -90,7 +89,7 @@ public sealed class AuthenticationServiceTests
         _refreshTokens.FindActiveUserIdAsync("hash-of-presented", Arg.Any<CancellationToken>())
             .Returns(_userId);
 
-        _identity.FindByIdAsync(_userId, Arg.Any<CancellationToken>()).Returns(_user);
+        _accounts.FindByIdAsync(_userId, Arg.Any<CancellationToken>()).Returns(_user);
 
         _refreshTokens.RotateAsync(
                 "hash-of-presented",
@@ -118,7 +117,7 @@ public sealed class AuthenticationServiceTests
         result.IsError.ShouldBeTrue();
         result.TopError.Code.ShouldBe(UserErrors.InvalidRefreshToken.Code);
 
-        await _identity.DidNotReceive().FindByIdAsync(Arg.Any<Guid>(), Arg.Any<CancellationToken>());
+        await _accounts.DidNotReceive().FindByIdAsync(Arg.Any<Guid>(), Arg.Any<CancellationToken>());
         await _refreshTokens.DidNotReceive().RotateAsync(
             Arg.Any<string>(),
             Arg.Any<string>(),
@@ -132,7 +131,7 @@ public sealed class AuthenticationServiceTests
         _refreshTokens.FindActiveUserIdAsync(Arg.Any<string>(), Arg.Any<CancellationToken>())
             .Returns(_userId);
 
-        _identity.FindByIdAsync(_userId, Arg.Any<CancellationToken>()).Returns(UserErrors.NotFound);
+        _accounts.FindByIdAsync(_userId, Arg.Any<CancellationToken>()).Returns(UserErrors.NotFound);
 
         Result<AuthenticationTokens> result =
             await _service.RefreshAsync("presented", CancellationToken.None);
@@ -154,7 +153,7 @@ public sealed class AuthenticationServiceTests
         _refreshTokens.FindActiveUserIdAsync(Arg.Any<string>(), Arg.Any<CancellationToken>())
             .Returns(_userId);
 
-        _identity.FindByIdAsync(_userId, Arg.Any<CancellationToken>()).Returns(_user);
+        _accounts.FindByIdAsync(_userId, Arg.Any<CancellationToken>()).Returns(_user);
 
         _refreshTokens.RotateAsync(
                 Arg.Any<string>(),
@@ -185,7 +184,8 @@ public sealed class AuthenticationServiceTests
     public async Task RegisterAsync_DelegatesToTheAccountStore()
     {
         Registration request = new("ada@example.com", "pw", "Ada", "Lovelace");
-        _identity.RegisterAsync(request, Arg.Any<CancellationToken>()).Returns(_userId);
+        _accounts.RegisterAsync("ada@example.com", "pw", "Ada", "Lovelace", Arg.Any<CancellationToken>())
+            .Returns(_userId);
 
         Result<Guid> result = await _service.RegisterAsync(request, CancellationToken.None);
 

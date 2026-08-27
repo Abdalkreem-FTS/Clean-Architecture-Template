@@ -36,7 +36,7 @@ public sealed class ApiTestFactory : WebApplicationFactory<Program>, IAsyncLifet
         await connection.OpenAsync(TestContext.Current.CancellationToken);
 
         await using NpgsqlCommand command = connection.CreateCommand();
-        command.CommandText = "TRUNCATE users CASCADE";
+        command.CommandText = """TRUNCATE "AspNetUsers" CASCADE""";
 
         await command.ExecuteNonQueryAsync(TestContext.Current.CancellationToken);
     }
