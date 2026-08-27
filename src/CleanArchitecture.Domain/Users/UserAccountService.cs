@@ -52,7 +52,7 @@ public sealed class UserAccountService(IUserRepository users, TimeProvider clock
 
         if (await users.IsLockedOutAsync(user, cancellationToken))
         {
-            return UserErrors.LockedOut;
+            return UserErrors.InvalidCredentials;
         }
 
         await users.ResetFailedAttemptsAsync(user, cancellationToken);

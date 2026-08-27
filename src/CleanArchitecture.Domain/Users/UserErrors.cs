@@ -10,11 +10,10 @@ public static class UserErrors
     public static readonly Error EmailNotUnique =
         Error.Conflict("Users.EmailNotUnique", "That email address is already registered.");
 
+    // Also returned for a locked-out account, deliberately: a distinct status here would let an
+    // attacker tell which emails exist by brute-forcing until the response changes.
     public static readonly Error InvalidCredentials =
         Error.Unauthorized("Users.InvalidCredentials", "Email address or password is incorrect.");
-
-    public static readonly Error LockedOut =
-        Error.Forbidden("Users.LockedOut", "Too many failed sign-in attempts. Try again later.");
 
     public static readonly Error EmailNotConfirmed =
         Error.Forbidden("Users.EmailNotConfirmed", "Confirm your email address before signing in.");

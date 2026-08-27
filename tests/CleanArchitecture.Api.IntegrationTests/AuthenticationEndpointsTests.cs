@@ -193,7 +193,9 @@ public sealed class AuthenticationEndpointsTests(ApiTestFactory factory) : BaseA
 
         using HttpResponseMessage response = await PostLoginAsync(TestUsers.Ada, TestUsers.Password);
 
-        response.StatusCode.ShouldBe(HttpStatusCode.Forbidden);
+        // Same status a wrong password gets, deliberately: a distinct one here would let an
+        // attacker tell which emails exist by brute-forcing until the response changes.
+        response.StatusCode.ShouldBe(HttpStatusCode.Unauthorized);
     }
 
     [Fact]
@@ -205,7 +207,7 @@ public sealed class AuthenticationEndpointsTests(ApiTestFactory factory) : BaseA
 
         using (HttpResponseMessage locked = await PostLoginAsync(TestUsers.LockedOut, TestUsers.Password))
         {
-            locked.StatusCode.ShouldBe(HttpStatusCode.Forbidden);
+            locked.StatusCode.ShouldBe(HttpStatusCode.Unauthorized);
         }
 
         await ClearLockoutAsync(TestUsers.LockedOut);
