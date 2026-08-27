@@ -6,7 +6,9 @@ using CleanArchitecture.Domain.Users;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Options;
+using Microsoft.Extensions.Time.Testing;
 using Npgsql;
 
 namespace CleanArchitecture.Api.IntegrationTests;
@@ -63,6 +65,24 @@ public abstract class BaseApiTest(ApiTestFactory factory) : IAsyncLifetime
             {
                 builder.UseSetting(key, value);
             }
+        });
+
+    // Swaps in a clock the test drives itself, so a test that needs something to expire can
+    // move time forward instead of waiting on the wall clock for it. Only reaches code that
+    // resolves TimeProvider from DI — JwtBearer validates access-token lifetime against the
+    // real system clock regardless, since TokenValidationParameters.TimeProvider has no public
+    // setter in this IdentityModel version.
+    protected WebApplicationFactory<Program> FactoryWithFakeClock(
+        FakeTimeProvider clock,
+        params (string Key, string Value)[] settings) =>
+        Factory.WithWebHostBuilder(builder =>
+        {
+            foreach ((string key, string value) in settings)
+            {
+                builder.UseSetting(key, value);
+            }
+
+            builder.ConfigureServices(services => services.Replace(ServiceDescriptor.Singleton<TimeProvider>(clock)));
         });
 
 

@@ -7,6 +7,7 @@ using System.Threading.Tasks;
 using CleanArchitecture.Api.IntegrationTests.Configuration;
 using CleanArchitecture.Domain.Users;
 using Microsoft.AspNetCore.Mvc.Testing;
+using Microsoft.Extensions.Time.Testing;
 using Shouldly;
 using Xunit;
 
@@ -329,8 +330,11 @@ public sealed class AuthenticationEndpointsTests(ApiTestFactory factory) : BaseA
     [Fact]
     public async Task Refresh_WithAnExpiredButUnrevokedToken_ReturnsUnauthorized()
     {
-        await using WebApplicationFactory<Program> shortLived =
-            FactoryWith((SettingKeys.JwtRefreshTokenLifetime, ShortRefreshTokenLifetime));
+        FakeTimeProvider clock = new(DateTimeOffset.UtcNow);
+
+        await using WebApplicationFactory<Program> shortLived = FactoryWithFakeClock(
+            clock,
+            (SettingKeys.JwtRefreshTokenLifetime, ShortRefreshTokenLifetime));
 
         using HttpClient client = shortLived.CreateClient();
 
@@ -344,8 +348,9 @@ public sealed class AuthenticationEndpointsTests(ApiTestFactory factory) : BaseA
             payload = (await login.Content.ReadFromJsonAsync<AuthPayload>(Json, Ct))!;
         }
 
-        // Expiry is compared in SQL against the injected clock, so waiting past it is exact.
-        await Task.Delay(_shortRefreshTokenLifetimeSpan + _expiryMargin, Ct);
+        // Expiry is compared in SQL against the injected clock, so moving it forward past the
+        // token's lifetime is exact — and instant, unlike waiting on the wall clock for real.
+        clock.Advance(_shortRefreshTokenLifetimeSpan + _expiryMargin);
 
         using HttpResponseMessage refreshed = await PutRefreshAsync(client, payload.RefreshToken);
 
