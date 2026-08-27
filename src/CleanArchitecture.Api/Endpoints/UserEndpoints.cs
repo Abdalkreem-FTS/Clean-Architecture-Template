@@ -2,6 +2,7 @@ using CleanArchitecture.Api.Contracts;
 using CleanArchitecture.Api.Extensions;
 using CleanArchitecture.Api.Filters;
 using CleanArchitecture.Application.Abstractions;
+using CleanArchitecture.Application.Authentication;
 using CleanArchitecture.Application.Common;
 using CleanArchitecture.Application.Users;
 using CleanArchitecture.Domain.Common.Results;
@@ -16,6 +17,24 @@ public static class UserEndpoints
         RouteGroupBuilder group = app.MapGroup("/api/users")
             .WithTags("Users")
             .RequireAuthorization();
+
+        group.MapPost("", async (
+                RegisterRequest request,
+                IAuthenticationService authenticationService,
+                CancellationToken cancellationToken) =>
+            {
+                Result<Guid> result =
+                    await authenticationService.RegisterAsync(request.ToRegistration(), cancellationToken);
+
+                return result.Match(
+                    id => Results.Created($"/api/users/{id}", new RegisteredResponse(id)),
+                    errors => errors.ToProblem());
+            })
+            .WithSummary("Create an account")
+            .WithValidation<RegisterRequest>()
+            .AllowAnonymous()
+            .Produces<RegisteredResponse>(StatusCodes.Status201Created)
+            .ProducesProblem(StatusCodes.Status409Conflict);
 
         group.MapGet("/me", async (IUserService users, CancellationToken cancellationToken) =>
             {

@@ -18,7 +18,7 @@ public sealed class AuthenticationEndpointsTests(ApiTestFactory factory) : BaseA
     public async Task Register_WithAValidRequest_CreatesTheAccountAndReturnsItsId()
     {
         using HttpResponseMessage response = await Client.PostAsJsonAsync(
-            Url(Routes.Authentication.Register),
+            Url(Routes.Users.All),
             new
             {
                 email = TestUsers.Ada,
@@ -57,7 +57,7 @@ public sealed class AuthenticationEndpointsTests(ApiTestFactory factory) : BaseA
         await RegisterAsync(TestUsers.Ada);
 
         using HttpResponseMessage response = await Client.PostAsJsonAsync(
-            Url(Routes.Authentication.Register),
+            Url(Routes.Users.All),
             new
             {
                 email = TestUsers.Ada,
@@ -77,7 +77,7 @@ public sealed class AuthenticationEndpointsTests(ApiTestFactory factory) : BaseA
 
         HttpResponseMessage[] responses = await Task.WhenAll(
             Enumerable.Range(0, concurrentAttempts).Select(_ => Client.PostAsJsonAsync(
-                Url(Routes.Authentication.Register),
+                Url(Routes.Users.All),
                 new
                 {
                     email = TestUsers.Ada,
@@ -108,7 +108,7 @@ public sealed class AuthenticationEndpointsTests(ApiTestFactory factory) : BaseA
     public async Task Register_WithAMalformedAddress_ReturnsABadRequest()
     {
         using HttpResponseMessage response = await Client.PostAsJsonAsync(
-            Url(Routes.Authentication.Register),
+            Url(Routes.Users.All),
             new
             {
                 email = TestUsers.MalformedEmail,
@@ -125,7 +125,7 @@ public sealed class AuthenticationEndpointsTests(ApiTestFactory factory) : BaseA
     public async Task Register_WithAPasswordBelowThePolicy_ReturnsABadRequest()
     {
         using HttpResponseMessage response = await Client.PostAsJsonAsync(
-            Url(Routes.Authentication.Register),
+            Url(Routes.Users.All),
             new
             {
                 email = TestUsers.Ada,
@@ -270,7 +270,7 @@ public sealed class AuthenticationEndpointsTests(ApiTestFactory factory) : BaseA
         await RegisterAsync(TestUsers.Ada);
         AuthPayload first = await LoginAsync(TestUsers.Ada);
 
-        using HttpResponseMessage response = await PostRefreshAsync(first.RefreshToken);
+        using HttpResponseMessage response = await PutRefreshAsync(first.RefreshToken);
 
         response.StatusCode.ShouldBe(HttpStatusCode.OK);
 
@@ -286,12 +286,12 @@ public sealed class AuthenticationEndpointsTests(ApiTestFactory factory) : BaseA
         await RegisterAsync(TestUsers.Ada);
         AuthPayload payload = await LoginAsync(TestUsers.Ada);
 
-        using (HttpResponseMessage first = await PostRefreshAsync(payload.RefreshToken))
+        using (HttpResponseMessage first = await PutRefreshAsync(payload.RefreshToken))
         {
             first.StatusCode.ShouldBe(HttpStatusCode.OK);
         }
 
-        using HttpResponseMessage second = await PostRefreshAsync(payload.RefreshToken);
+        using HttpResponseMessage second = await PutRefreshAsync(payload.RefreshToken);
 
         second.StatusCode.ShouldBe(HttpStatusCode.Unauthorized);
     }
@@ -305,7 +305,7 @@ public sealed class AuthenticationEndpointsTests(ApiTestFactory factory) : BaseA
         AuthPayload payload = await LoginAsync(TestUsers.Ada);
 
         HttpResponseMessage[] responses = await Task.WhenAll(
-            Enumerable.Range(0, concurrentAttempts).Select(_ => PostRefreshAsync(payload.RefreshToken)));
+            Enumerable.Range(0, concurrentAttempts).Select(_ => PutRefreshAsync(payload.RefreshToken)));
 
         try
         {
@@ -345,7 +345,7 @@ public sealed class AuthenticationEndpointsTests(ApiTestFactory factory) : BaseA
         // Expiry is compared in SQL against the injected clock, so waiting past it is exact.
         await Task.Delay(_shortRefreshTokenLifetimeSpan + _expiryMargin, Ct);
 
-        using HttpResponseMessage refreshed = await PostRefreshAsync(client, payload.RefreshToken);
+        using HttpResponseMessage refreshed = await PutRefreshAsync(client, payload.RefreshToken);
 
         refreshed.StatusCode.ShouldBe(HttpStatusCode.Unauthorized);
 
@@ -355,7 +355,7 @@ public sealed class AuthenticationEndpointsTests(ApiTestFactory factory) : BaseA
     [Fact]
     public async Task Refresh_WithAnUnknownToken_ReturnsUnauthorized()
     {
-        using HttpResponseMessage response = await PostRefreshAsync(TestTokens.Unknown);
+        using HttpResponseMessage response = await PutRefreshAsync(TestTokens.Unknown);
 
         response.StatusCode.ShouldBe(HttpStatusCode.Unauthorized);
     }
@@ -366,12 +366,12 @@ public sealed class AuthenticationEndpointsTests(ApiTestFactory factory) : BaseA
         await RegisterAsync(TestUsers.Ada);
         AuthPayload payload = await LoginAsync(TestUsers.Ada);
 
-        using (HttpResponseMessage logout = await PostLogoutAsync(payload.RefreshToken))
+        using (HttpResponseMessage logout = await DeleteLogoutAsync(payload.RefreshToken))
         {
             logout.StatusCode.ShouldBe(HttpStatusCode.NoContent);
         }
 
-        using HttpResponseMessage refresh = await PostRefreshAsync(payload.RefreshToken);
+        using HttpResponseMessage refresh = await PutRefreshAsync(payload.RefreshToken);
 
         refresh.StatusCode.ShouldBe(HttpStatusCode.Unauthorized);
     }
@@ -379,7 +379,7 @@ public sealed class AuthenticationEndpointsTests(ApiTestFactory factory) : BaseA
     [Fact]
     public async Task Logout_WithAnUnknownToken_ReturnsNoContent()
     {
-        using HttpResponseMessage response = await PostLogoutAsync(TestTokens.Unknown);
+        using HttpResponseMessage response = await DeleteLogoutAsync(TestTokens.Unknown);
 
         response.StatusCode.ShouldBe(HttpStatusCode.NoContent);
     }

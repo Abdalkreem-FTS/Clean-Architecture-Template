@@ -6,14 +6,11 @@ namespace CleanArchitecture.Api.IntegrationTests.Configuration;
 // edit here rather than a search-and-replace across the tests.
 internal static class Routes
 {
-    internal static class Authentication
+    internal static class Tokens
     {
-        private const string Group = "/api/authentication";
-
-        public const string Register = Group + "/register";
-        public const string Login = Group + "/login";
-        public const string Refresh = Group + "/refresh";
-        public const string Logout = Group + "/logout";
+        // A single resource path: POST issues a pair from credentials, PUT exchanges a refresh
+        // token for a new pair, DELETE revokes one.
+        public const string All = "/api/tokens";
     }
 
     internal static class Users

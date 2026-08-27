@@ -11,31 +11,25 @@ public static class AuthenticationEndpoints
 {
     public static void MapAuthenticationEndpoints(this IEndpointRouteBuilder app)
     {
-        RouteGroupBuilder group = app.MapGroup("/api/authentication")
+        RouteGroupBuilder group = app.MapGroup("/api/tokens")
             .WithTags("Authentication")
             .AllowAnonymous();
 
-        group.MapPost("/register", Register)
-            .WithSummary("Create an account")
-            .WithValidation<RegisterRequest>()
-            .Produces<RegisteredResponse>(StatusCodes.Status201Created)
-            .ProducesProblem(StatusCodes.Status409Conflict);
-
-        group.MapPost("/login", Login)
+        group.MapPost("", Login)
             .WithSummary("Exchange credentials for tokens")
             .WithValidation<LoginRequest>()
             .Produces<AuthenticationResponse>()
             .ProducesProblem(StatusCodes.Status401Unauthorized)
             .ProducesProblem(StatusCodes.Status403Forbidden);
 
-        group.MapPost("/refresh", Refresh)
+        group.MapPut("", Refresh)
             .WithSummary("Exchange a refresh token for a new pair")
             .WithDescription("The token presented is revoked, so each refresh token works exactly once.")
             .WithValidation<RefreshRequest>()
             .Produces<AuthenticationResponse>()
             .ProducesProblem(StatusCodes.Status401Unauthorized);
 
-        group.MapPost("/logout", Logout)
+        group.MapDelete("", Logout)
             .WithSummary("Revoke a refresh token")
             .WithValidation<RefreshRequest>()
             .Produces(StatusCodes.Status204NoContent);
@@ -65,15 +59,6 @@ public static class AuthenticationEndpoints
 
         return result.Match(
             tokens => Results.Ok(AuthenticationResponse.From(tokens)),
-            errors => errors.ToProblem());
-    }
-
-    private static async Task<IResult> Register(RegisterRequest request, IAuthenticationService authenticationService, CancellationToken cancellationToken)
-    {
-        Result<Guid> result = await authenticationService.RegisterAsync(request.ToRegistration(), cancellationToken);
-
-        return result.Match(
-            id => Results.Created($"/api/users/{id}", new RegisteredResponse(id)),
             errors => errors.ToProblem());
     }
 }

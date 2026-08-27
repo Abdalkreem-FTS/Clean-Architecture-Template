@@ -2,7 +2,7 @@ using CleanArchitecture.Application.Authentication;
 
 namespace CleanArchitecture.Api.Contracts;
 
-// The wire shapes for /api/authentication. Requests carry a To… that hands the use case its own
+// The wire shapes for /api/tokens and /api/users. Requests carry a To… that hands the use case its own
 // type; responses carry a From that builds the wire shape out of one. Nothing below Api sees
 // either of these records.
 public sealed record RegisterRequest(string Email, string Password, string FirstName, string LastName)

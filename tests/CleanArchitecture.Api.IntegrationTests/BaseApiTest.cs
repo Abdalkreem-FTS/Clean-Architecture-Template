@@ -75,7 +75,7 @@ public abstract class BaseApiTest(ApiTestFactory factory) : IAsyncLifetime
         string password = TestUsers.Password)
     {
         using HttpResponseMessage response = await client.PostAsJsonAsync(
-            Url(Routes.Authentication.Register),
+            Url(Routes.Users.All),
             new { email, password, firstName = TestUsers.FirstName, lastName = TestUsers.LastName },
             Ct);
 
@@ -85,7 +85,7 @@ public abstract class BaseApiTest(ApiTestFactory factory) : IAsyncLifetime
     }
 
     protected static Task<HttpResponseMessage> PostLoginAsync(HttpClient client, string email, string password) =>
-        client.PostAsJsonAsync(Url(Routes.Authentication.Login), new { email, password }, Ct);
+        client.PostAsJsonAsync(Url(Routes.Tokens.All), new { email, password }, Ct);
 
     protected Task<HttpResponseMessage> PostLoginAsync(string email, string password) =>
         PostLoginAsync(Client, email, password);
@@ -99,14 +99,21 @@ public abstract class BaseApiTest(ApiTestFactory factory) : IAsyncLifetime
         return (await response.Content.ReadFromJsonAsync<AuthPayload>(Json, Ct))!;
     }
 
-    protected static Task<HttpResponseMessage> PostRefreshAsync(HttpClient client, string refreshToken) =>
-        client.PostAsJsonAsync(Url(Routes.Authentication.Refresh), new { refreshToken }, Ct);
+    protected static Task<HttpResponseMessage> PutRefreshAsync(HttpClient client, string refreshToken) =>
+        client.PutAsJsonAsync(Url(Routes.Tokens.All), new { refreshToken }, Ct);
 
-    protected Task<HttpResponseMessage> PostRefreshAsync(string refreshToken) =>
-        PostRefreshAsync(Client, refreshToken);
+    protected Task<HttpResponseMessage> PutRefreshAsync(string refreshToken) =>
+        PutRefreshAsync(Client, refreshToken);
 
-    protected Task<HttpResponseMessage> PostLogoutAsync(string refreshToken) =>
-        Client.PostAsJsonAsync(Url(Routes.Authentication.Logout), new { refreshToken }, Ct);
+    protected Task<HttpResponseMessage> DeleteLogoutAsync(string refreshToken) =>
+        DeleteAsJsonAsync(Client, Routes.Tokens.All, new { refreshToken });
+
+    private static async Task<HttpResponseMessage> DeleteAsJsonAsync<T>(HttpClient client, string url, T body)
+    {
+        using HttpRequestMessage request = new(HttpMethod.Delete, Url(url)) { Content = JsonContent.Create(body) };
+
+        return await client.SendAsync(request, Ct);
+    }
 
     protected async Task<SignedInUser> SignInAsync(string email, bool asAdmin = false)
     {
@@ -150,21 +157,21 @@ public abstract class BaseApiTest(ApiTestFactory factory) : IAsyncLifetime
     // silently stop granting anything.
     protected Task GrantAdminAsync(Guid userId) => ExecuteAsync(
         """
-        INSERT INTO user_roles (user_id, role_id)
-        SELECT @user_id, id FROM roles WHERE name = @role
+        INSERT INTO "AspNetUserRoles" (user_id, role_id)
+        SELECT @user_id, id FROM "AspNetRoles" WHERE name = @role
         ON CONFLICT DO NOTHING
         """,
         ("user_id", userId),
         ("role", Roles.Admin));
 
     protected Task ClearLockoutAsync(string email) => ExecuteAsync(
-        "UPDATE users SET lockout_end = NULL WHERE email = @email",
+        """UPDATE "AspNetUsers" SET lockout_end = NULL WHERE email = @email""",
         ("email", email));
 
-    protected Task<long> CountUsersAsync() => ScalarAsync<long>("SELECT count(*) FROM users");
+    protected Task<long> CountUsersAsync() => ScalarAsync<long>("""SELECT count(*) FROM "AspNetUsers" """);
 
     protected Task<long> CountAccountsWithEmailAsync(string email) =>
-        ScalarAsync<long>("SELECT count(*) FROM users WHERE email = @email", ("email", email));
+        ScalarAsync<long>("""SELECT count(*) FROM "AspNetUsers" WHERE email = @email""", ("email", email));
 
     protected Task<long> CountActiveRefreshTokensAsync() =>
         ScalarAsync<long>("SELECT count(*) FROM refresh_tokens WHERE revoked_at_utc IS NULL");
