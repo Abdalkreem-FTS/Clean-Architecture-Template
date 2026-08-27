@@ -10,8 +10,16 @@ jobs:
     # Pinned rather than latest: the runner image moves, and a green build that turns red
     # because GitHub rolled the label forward is the worst kind of failure to debug.
     runs-on: ubuntu-24.04
+    # Debian slim instead of the full runner image for the actual job steps; Alpine was considered
+    # but its musl libc breaks the Node-based actions below (checkout, cache, setup-dotnet).
+    container: debian:stable-slim
 
     steps:
+      - name: Install container prerequisites
+        run: |
+          apt-get update
+          apt-get install -y --no-install-recommends git ca-certificates curl
+
       - uses: actions/checkout@v5
 
       - uses: actions/setup-dotnet@v5
