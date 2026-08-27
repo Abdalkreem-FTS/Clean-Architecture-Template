@@ -9,7 +9,7 @@ internal sealed class ApplicationUserConfiguration : IEntityTypeConfiguration<Ap
 {
     public void Configure(EntityTypeBuilder<ApplicationUser> builder)
     {
-        builder.ToTable("users");
+        builder.ToTable("AspNetUsers");
 
         builder.Property(user => user.FirstName).HasMaxLength(ApplicationUser.MaxNameLength).IsRequired();
         builder.Property(user => user.LastName).HasMaxLength(ApplicationUser.MaxNameLength).IsRequired();
@@ -24,30 +24,30 @@ internal sealed class ApplicationUserConfiguration : IEntityTypeConfiguration<Ap
 
 internal sealed class ApplicationRoleConfiguration : IEntityTypeConfiguration<ApplicationRole>
 {
-    public void Configure(EntityTypeBuilder<ApplicationRole> builder) => builder.ToTable("roles");
+    public void Configure(EntityTypeBuilder<ApplicationRole> builder) => builder.ToTable("AspNetRoles");
 }
 
 internal sealed class UserRoleConfiguration : IEntityTypeConfiguration<IdentityUserRole<Guid>>
 {
-    public void Configure(EntityTypeBuilder<IdentityUserRole<Guid>> builder) => builder.ToTable("user_roles");
+    public void Configure(EntityTypeBuilder<IdentityUserRole<Guid>> builder) => builder.ToTable("AspNetUserRoles");
 }
 
 internal sealed class RoleClaimConfiguration : IEntityTypeConfiguration<IdentityRoleClaim<Guid>>
 {
-    public void Configure(EntityTypeBuilder<IdentityRoleClaim<Guid>> builder) => builder.ToTable("role_claims");
+    public void Configure(EntityTypeBuilder<IdentityRoleClaim<Guid>> builder) => builder.ToTable("AspNetRoleClaims");
 }
 
 internal sealed class UserClaimConfiguration : IEntityTypeConfiguration<IdentityUserClaim<Guid>>
 {
-    public void Configure(EntityTypeBuilder<IdentityUserClaim<Guid>> builder) => builder.ToTable("user_claims");
+    public void Configure(EntityTypeBuilder<IdentityUserClaim<Guid>> builder) => builder.ToTable("AspNetUserClaims");
 }
 
 internal sealed class UserLoginConfiguration : IEntityTypeConfiguration<IdentityUserLogin<Guid>>
 {
-    public void Configure(EntityTypeBuilder<IdentityUserLogin<Guid>> builder) => builder.ToTable("user_logins");
+    public void Configure(EntityTypeBuilder<IdentityUserLogin<Guid>> builder) => builder.ToTable("AspNetUserLogins");
 }
 
 internal sealed class UserTokenConfiguration : IEntityTypeConfiguration<IdentityUserToken<Guid>>
 {
-    public void Configure(EntityTypeBuilder<IdentityUserToken<Guid>> builder) => builder.ToTable("user_tokens");
+    public void Configure(EntityTypeBuilder<IdentityUserToken<Guid>> builder) => builder.ToTable("AspNetUserTokens");
 }

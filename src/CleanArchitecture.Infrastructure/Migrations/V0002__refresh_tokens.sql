@@ -7,7 +7,7 @@ CREATE TABLE refresh_tokens (
     revoked_at_utc timestamptz  NULL,
 
     CONSTRAINT pk_refresh_tokens PRIMARY KEY (id),
-    CONSTRAINT fk_refresh_tokens_users FOREIGN KEY (user_id) REFERENCES users (id) ON DELETE CASCADE
+    CONSTRAINT fk_refresh_tokens_users FOREIGN KEY (user_id) REFERENCES "AspNetUsers" (id) ON DELETE CASCADE
 );
 
 CREATE UNIQUE INDEX ix_refresh_tokens_token_hash ON refresh_tokens (token_hash);
