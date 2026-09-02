@@ -1,4 +1,3 @@
-using System;
 using CleanArchitecture.Domain.Users;
 using CleanArchitecture.Infrastructure.Identity;
 using Microsoft.AspNetCore.Identity.EntityFrameworkCore;

@@ -9,15 +9,15 @@ using DomainUser = CleanArchitecture.Domain.Users.User;
 
 namespace CleanArchitecture.Application.UnitTests;
 
-public sealed class UserServiceTests
+public sealed class UserProfileServiceTests
 {
     private readonly IUserAccountService _accounts = Substitute.For<IUserAccountService>();
     private readonly ICurrentUser _currentUser = Substitute.For<ICurrentUser>();
-    private readonly UserService _service;
+    private readonly UserProfileService _service;
 
     private static readonly Guid _userId = Guid.Parse("11111111-1111-1111-1111-111111111111");
 
-    public UserServiceTests() => _service = new UserService(_accounts, _currentUser);
+    public UserProfileServiceTests() => _service = new UserProfileService(_accounts, _currentUser);
 
     [Fact]
     public async Task AssignRoleAsync_WithAnUnknownRole_RefusesWithoutTouchingTheStore()

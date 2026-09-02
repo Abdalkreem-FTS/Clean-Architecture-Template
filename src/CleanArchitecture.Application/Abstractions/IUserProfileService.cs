@@ -4,7 +4,7 @@ using CleanArchitecture.Domain.Common.Results;
 
 namespace CleanArchitecture.Application.Abstractions;
 
-public interface IUserService
+public interface IUserProfileService
 {
     Task<Result<User>> GetCurrentAsync(CancellationToken cancellationToken);
 

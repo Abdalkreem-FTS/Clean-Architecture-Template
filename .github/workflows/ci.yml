@@ -12,13 +12,21 @@ jobs:
     runs-on: ubuntu-24.04
     # Debian slim instead of the full runner image for the actual job steps; Alpine was considered
     # but its musl libc breaks the Node-based actions below (checkout, cache, setup-dotnet).
-    container: debian:stable-slim
+    container:
+      image: debian:stable-slim
+      # The integration suite drives a PostgreSQL container through Testcontainers, which needs
+      # the host's Docker daemon. A container job is given no socket unless one is mounted in,
+      # so without this every test in that suite fails on DockerUnavailableException.
+      options: --volume /var/run/docker.sock:/var/run/docker.sock
 
     steps:
       - name: Install container prerequisites
         run: |
           apt-get update
-          apt-get install -y --no-install-recommends git ca-certificates curl
+          # libicu is what .NET uses for globalization; without it every dotnet command
+          # aborts at startup. libicu-dev rather than the versioned libicuNN runtime package
+          # so this keeps resolving when Debian stable rolls to the next release.
+          apt-get install -y --no-install-recommends git ca-certificates curl libicu-dev
 
       - uses: actions/checkout@v5
 

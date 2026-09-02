@@ -2,7 +2,6 @@ using CleanArchitecture.Api.Contracts;
 using CleanArchitecture.Api.Extensions;
 using CleanArchitecture.Api.Filters;
 using CleanArchitecture.Application.Abstractions;
-using CleanArchitecture.Application.Authentication;
 using CleanArchitecture.Application.Common;
 using CleanArchitecture.Application.Users;
 using CleanArchitecture.Domain.Common.Results;
@@ -36,7 +35,7 @@ public static class UserEndpoints
             .Produces<RegisteredResponse>(StatusCodes.Status201Created)
             .ProducesProblem(StatusCodes.Status409Conflict);
 
-        group.MapGet("/me", async (IUserService users, CancellationToken cancellationToken) =>
+        group.MapGet("/me", async (IUserProfileService users, CancellationToken cancellationToken) =>
             {
                 Result<User> result = await users.GetCurrentAsync(cancellationToken);
 
@@ -51,7 +50,7 @@ public static class UserEndpoints
         group.MapGet("", async (
                 int? page,
                 int? pageSize,
-                IUserService userService,
+                IUserProfileService userService,
                 CancellationToken cancellationToken) =>
             {
                 Result<Paged<User>> result = await userService.ListAsync(
@@ -72,7 +71,7 @@ public static class UserEndpoints
 
         group.MapGet("/{id:guid}", async (
                 Guid id,
-                IUserService users,
+                IUserProfileService users,
                 CancellationToken cancellationToken) =>
             {
                 Result<User> result = await users.GetByIdAsync(id, cancellationToken);
@@ -89,7 +88,7 @@ public static class UserEndpoints
         group.MapPost("/{id:guid}/roles", async (
                 Guid id,
                 AssignRoleRequest request,
-                IUserService users,
+                IUserProfileService users,
                 CancellationToken cancellationToken) =>
             {
                 Result<Success> result = await users.AssignRoleAsync(id, request.Role, cancellationToken);

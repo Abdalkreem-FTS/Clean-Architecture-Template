@@ -12,7 +12,7 @@ public static class ServiceCollectionExtensions
     {
         services.AddScoped<IUserAccountService, UserAccountService>();
         services.AddScoped<IAuthenticationService, AuthenticationService>();
-        services.AddScoped<IUserService, UserService>();
+        services.AddScoped<IUserProfileService, UserProfileService>();
 
         return services;
     }

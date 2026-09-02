@@ -14,7 +14,7 @@ public sealed class UserAccountService(IUserRepository users, TimeProvider clock
         string lastName,
         CancellationToken cancellationToken)
     {
-        User user = User.Register(email, firstName, lastName, clock.GetUtcNow());
+        var user = User.Register(email, firstName, lastName, clock.GetUtcNow());
 
         Result<User> created = await users.CreateAsync(user, password, cancellationToken);
 
@@ -40,17 +40,9 @@ public sealed class UserAccountService(IUserRepository users, TimeProvider clock
     {
         User? user = await users.FindByEmailAsync(email, cancellationToken);
 
-        if (user is null)
-        {
-            return UserErrors.InvalidCredentials;
-        }
-
-        if (!await users.VerifyPasswordAsync(user, password, cancellationToken))
-        {
-            return UserErrors.InvalidCredentials;
-        }
-
-        if (await users.IsLockedOutAsync(user, cancellationToken))
+        if (user is null
+            || !await users.VerifyPasswordAsync(user, password, cancellationToken)
+            || await users.IsLockedOutAsync(user, cancellationToken))
         {
             return UserErrors.InvalidCredentials;
         }

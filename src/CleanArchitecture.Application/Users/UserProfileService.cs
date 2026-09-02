@@ -6,7 +6,7 @@ using DomainUser = CleanArchitecture.Domain.Users.User;
 
 namespace CleanArchitecture.Application.Users;
 
-internal sealed class UserService(IUserAccountService accounts, ICurrentUser currentUser) : IUserService
+internal sealed class UserProfileService(IUserAccountService accounts, ICurrentUser currentUser) : IUserProfileService
 {
     public Task<Result<User>> GetCurrentAsync(CancellationToken cancellationToken) =>
         currentUser.UserId is not { } userId
