@@ -1,0 +1,59 @@
+{
+  "$schema": "http://json.schemastore.org/template",
+  "author": "Abdalkreem Bzoor",
+  "classifications": [ "Web", "WebAPI", "Clean Architecture", "PostgreSQL" ],
+  "identity": "AbdalkreemBzoor.CleanArchitecture.Service",
+  "name": "Clean Architecture service (PostgreSQL, Identity, Evolve)",
+  "shortName": "clean-architecture",
+  "description": "Four layers, ASP.NET Core Identity with JWT and role-based authorization, PostgreSQL, SQL migrations applied by Evolve, and tests against a real database container.",
+  "tags": {
+    "language": "C#",
+    "type": "solution"
+  },
+
+  "sourceName": "CleanArchitecture",
+  "preferNameDirectory": true,
+
+  "symbols": {
+    "signingKey": {
+      "type": "generated",
+      "generator": "guid",
+      "replaces": "dev-only-signing-key-not-for-any-real-environment",
+      "parameters": { "defaultFormat": "N" },
+      "description": "Gives each generated solution its own development signing key."
+    },
+
+    "composeSigningKey": {
+      "type": "generated",
+      "generator": "guid",
+      "replaces": "compose-only-signing-key-not-for-any-real-environment",
+      "parameters": { "defaultFormat": "N" },
+      "description": "compose.yaml carries its own key, so it needs its own symbol or every generated project would ship the same one."
+    }
+  },
+
+  "sources": [
+    {
+      "exclude": [
+        "**/bin/**",
+        "**/obj/**",
+        "**/.vs/**",
+        "**/.idea/**",
+        "**/*.user",
+        "**/TestResults/**",
+        ".template.config/**"
+      ]
+    }
+  ],
+
+  "postActions": [
+    {
+      "description": "Before deploying",
+      "manualInstructions": [
+        { "text": "Set Jwt:SigningKey (32+ chars) from a secret store, and Seed:AdminEmail / Seed:AdminPassword to create the first administrator." }
+      ],
+      "actionId": "AC1156F7-BB77-4DB8-B28F-24EEBCCA1E5C",
+      "continueOnError": true
+    }
+  ]
+}

@@ -1,0 +1,74 @@
+name: CI
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+
+jobs:
+  build-and-test:
+    # Pinned rather than latest: the runner image moves, and a green build that turns red
+    # because GitHub rolled the label forward is the worst kind of failure to debug.
+    runs-on: ubuntu-24.04
+    # Debian slim instead of the full runner image for the actual job steps; Alpine was considered
+    # but its musl libc breaks the Node-based actions below (checkout, cache, setup-dotnet).
+    container:
+      image: debian:stable-slim
+      # The integration suite drives a PostgreSQL container through Testcontainers, which needs
+      # the host's Docker daemon. A container job is given no socket unless one is mounted in,
+      # so without this every test in that suite fails on DockerUnavailableException.
+      options: --volume /var/run/docker.sock:/var/run/docker.sock
+
+    steps:
+      - name: Install container prerequisites
+        run: |
+          apt-get update
+          # libicu is what .NET uses for globalization; without it every dotnet command
+          # aborts at startup. libicu-dev rather than the versioned libicuNN runtime package
+          # so this keeps resolving when Debian stable rolls to the next release.
+          apt-get install -y --no-install-recommends git ca-certificates curl libicu-dev
+
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-dotnet@v5
+        with:
+          dotnet-version: '10.0.x'
+
+      - uses: actions/cache@v4
+        with:
+          path: ~/.nuget/packages
+          key: nuget-${{ runner.os }}-${{ hashFiles('Directory.Packages.props') }}
+          restore-keys: nuget-${{ runner.os }}-
+
+      - run: dotnet build -c Release
+
+      # One step per suite, each running even if an earlier one failed, so a push reports every
+      # failure at once instead of only the first.
+      - name: Architecture tests
+        if: ${{ !cancelled() }}
+        run: dotnet test --project tests/CleanArchitecture.ArchitectureTests -c Release --no-build
+
+      - name: Domain unit tests
+        if: ${{ !cancelled() }}
+        run: dotnet test --project tests/CleanArchitecture.Domain.UnitTests -c Release --no-build
+
+      - name: Application unit tests
+        if: ${{ !cancelled() }}
+        run: dotnet test --project tests/CleanArchitecture.Application.UnitTests -c Release --no-build
+
+      - name: Integration tests
+        if: ${{ !cancelled() }}
+        run: dotnet test --project tests/CleanArchitecture.Api.IntegrationTests -c Release --no-build
+
+  # Its own job so the image build runs alongside the test suites rather than after them.
+  smoke:
+    runs-on: ubuntu-24.04
+
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Compose up and probe readiness
+        run: |
+          docker compose up -d --build
+          curl -fsS --retry 20 --retry-delay 3 --retry-all-errors http://localhost:8080/health/ready
+          docker compose down -v

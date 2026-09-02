@@ -1,0 +1,41 @@
+<Project>
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <LangVersion>latest</LangVersion>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <InvariantGlobalization>true</InvariantGlobalization>
+  </PropertyGroup>
+
+  <!-- Quality gates. A warning that is allowed to persist is not a warning. -->
+  <PropertyGroup>
+    <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+    <EnforceCodeStyleInBuild>true</EnforceCodeStyleInBuild>
+    <AnalysisLevel>latest-recommended</AnalysisLevel>
+    <Deterministic>true</Deterministic>
+  </PropertyGroup>
+
+  <PropertyGroup>
+    <IsTestProject>false</IsTestProject>
+    <IsTestProject Condition="$(MSBuildProjectName.EndsWith('Tests'))">true</IsTestProject>
+  </PropertyGroup>
+
+  <!-- Test projects are not shipped, so documentation and packability rules do not apply. -->
+  <PropertyGroup Condition="'$(IsTestProject)' == 'true'">
+    <IsPackable>false</IsPackable>
+    <NoWarn>$(NoWarn);CA1707;CA2007</NoWarn>
+
+    <!--
+      The .NET 10 SDK no longer runs VSTest through `dotnet test`. xunit v3 ships with
+      Microsoft.Testing.Platform support built in, so a test project is a self-hosting
+      executable and needs neither Microsoft.NET.Test.Sdk nor a VSTest adapter.
+
+      The opt-in itself lives in global.json at the repository root — setting the older
+      TestingPlatformDotnetTestSupport property here as well sends the SDK back down the
+      VSTest path and fails the run.
+    -->
+    <OutputType>Exe</OutputType>
+  </PropertyGroup>
+
+</Project>
